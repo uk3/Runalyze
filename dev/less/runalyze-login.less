@@ -1,0 +1,131 @@
+#login {
+	margin-top: 0;
+	transition: margin 1s ease;
+}
+
+.login .panel {
+	width: 400px;
+	margin: 0 auto;
+}
+
+.login-back {
+	position: relative;
+	top: -1em;
+}
+
+.input-container {
+	position: relative;
+	height: 36px;
+	line-height: 36px;
+	margin-bottom: 10px;
+
+	&.bottom-margin {
+		margin-bottom: 20px;
+	}
+
+	.input-icon {
+		position: absolute;
+		z-index: 2;
+		left: 0;
+		float: left;
+		width: 36px;
+		background: @color-green-very-light;
+		text-align: center;
+	}
+
+	.input-field {
+		position: relative;
+
+		.over-input {
+			position: absolute;
+			z-index: 2;
+			right: 10px;
+			top: 9px;
+		}
+	}
+}
+
+form .input-container:last-child {
+	margin-bottom: 0;
+}
+
+.input-container-checkbox {
+	position: relative;
+	height: 30px;
+	line-height: 30px;
+	margin-bottom: 0;
+	font-size: 13px;
+	color: #999;
+
+	.input-icon {
+		display: inline-block;
+		width: 36px;
+		text-align: center;
+	}
+
+	&.checked {
+		color: #000;
+
+		i.fa-toggle-off:before {
+			content: "\f205";
+		}
+	}
+
+	.input-checkbox-text {
+		display: inline;
+	}
+
+	label {
+		cursor: pointer;
+	}
+}
+
+.input-field {
+	input {
+		box-sizing: border-box;
+		height: 36px;
+		width: 100%;
+		padding: 0 10px 0 50px;
+		border: none;
+		background: #f3f6f6;
+		font-weight: 300;
+		letter-spacing: 1px;
+	}
+}
+
+.message-error {
+	color: @color-red-dark;
+}
+
+.input-message {
+	height: auto;
+	min-height: 36px;
+
+	.input-icon {
+		background: none;
+	}
+
+	.input-field {
+		padding: 5px 10px 5px 36px;
+		height: auto;
+		min-height: 26px;
+		line-height: 26px;
+	}
+
+	p {
+		padding: 5px 0;
+		height: auto;
+		min-height: 26px;
+		line-height: 26px;
+	}
+}
+
+.input-submit {
+	height: 36px;
+	line-height: 36px;
+	padding: 0 10px;
+	border: none;
+	background: @color-red;
+	color: @white;
+	font-weight: normal;
+}

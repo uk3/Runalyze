@@ -1,0 +1,31 @@
+body {
+	font: @font;
+	color: @font-color;
+	line-height: @line-height;
+}
+
+#header {
+	position: fixed;
+	width: 100%;
+	z-index: @z-index-headline;
+}
+
+#main {
+	padding-top: 45px;
+	background: #eee;
+
+	.container {
+		padding-top: 40px;
+		padding-bottom: 40px;
+	}
+}
+
+#footer {
+	
+}
+
+#header,
+#footer {
+	background-color: @color-background-black;
+	color: @color-background-black-text;
+}

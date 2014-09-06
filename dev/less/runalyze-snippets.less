@@ -1,0 +1,60 @@
+h1, h2, h3, h4, h5, h6 {
+	font-weight: 600;
+	text-rendering: optimizeLegibility;
+}
+h2, h3 {
+	margin: 0 0 .5em;
+}
+
+p {
+	margin: 0 0 1em;
+}
+
+button {
+	cursor: pointer;
+	border: none;
+
+	&.inline {
+		background: none;
+		padding: 0;
+	}
+}
+
+:focus {
+	outline: 1px solid #ccc;
+	outline-offset: 1px;
+}
+a:focus {
+	outline: thin dotted;
+}
+a, a:link {
+	text-decoration: none;
+}
+.modest-link {
+	display: inline-block;
+	font-size: 11px;
+	line-height: 18px;
+	color: @color-blue-very-light;
+	border-bottom: thin dotted;
+	opacity: 0.5;
+	letter-spacing: 1px;
+
+	&:hover {
+		opacity: 1;
+		border-bottom: 1px solid;
+	}
+}
+
+.l {
+	text-align: left;
+}
+.r {
+	text-align: right;
+}
+.c {
+	text-align: center;
+}
+
+.no-line-height {
+	line-height: 1;
+}

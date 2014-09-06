@@ -1,0 +1,48 @@
+.animation-fade-in-out {
+	overflow: hidden;
+
+	visibility: visible;
+	opacity: 1;
+	transition: opacity 0.5s linear;
+
+	.panel-content {
+		max-height: 800px;
+		overflow-y: scroll;
+	}
+
+	&.hidden {
+		display: block;
+		visibility: hidden;
+		opacity: 0;
+		transition: visibility 0s 0.5s, opacity 0.5s linear;
+
+		& > div {
+			margin-top: -1000px;
+			transition: margin-top 0s 0.5s linear;
+		}
+
+		.panel-content {
+			max-height: 0;
+			transition: max-height 0s 0.5s linear;
+		}
+	}
+}
+
+.hover-spin-icon:hover .fa {
+	-webkit-animation: spin 1s 1 ease-in-out;
+	-moz-animation: spin 1s 1 ease-in-out;
+	-o-animation: spin 1s 1 ease-in-out;
+}
+
+@-moz-keyframes spin {
+    from { -moz-transform: rotate(0deg); }
+    to { -moz-transform: rotate(360deg); }
+}
+@-webkit-keyframes spin {
+    from { -webkit-transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); }
+}
+@keyframes spin {
+    from {transform:rotate(0deg);}
+    to {transform:rotate(360deg);}
+}

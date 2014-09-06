@@ -22,6 +22,24 @@ if (isset($_GET['out']))
 if (SessionAccountHandler::isLoggedIn())
 	header('Location: index.php');
 
+include 'inc/tpl/header.php';
+
+if (USER_CANT_LOGIN) {
+	include FRONTEND_PATH.'tpl/login.maintenance.php';
+} else {
+	include FRONTEND_PATH.'tpl/login.form.php';
+
+	if (USER_CAN_REGISTER) {
+		include FRONTEND_PATH.'tpl/login.register.php';
+	}
+
+	include FRONTEND_PATH.'tpl/login.password.php';
+}
+
+include 'inc/tpl/footer.php';
+
+exit;
+
 $title = 'Runalyze v'.RUNALYZE_VERSION.' - '.__('Please login');
 $tpl   = 'tpl.loginWindow.php';
 
