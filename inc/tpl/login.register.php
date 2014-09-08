@@ -56,7 +56,7 @@ if (isset($_POST['new_username'])) {
 						</div>
 						<div class="input-container">
 							<div class="input-icon">
-								<i class="fa fa-fw fa-key"></i>
+								<i class="fa fa-fw fa-lock"></i>
 							</div>
 							<div class="input-field">
 								<input type="password" name="password" placeholder="<?php _e('Create Password'); ?>" autocomplete="off">
@@ -64,7 +64,7 @@ if (isset($_POST['new_username'])) {
 						</div>
 						<div class="input-container bottom-margin">
 							<div class="input-icon">
-								<i class="fa fa-fw fa-key"></i>
+								<i class="fa fa-fw fa-lock"></i>
 							</div>
 							<div class="input-field">
 								<input type="password" name="password_again" placeholder="<?php _e('Confirm Password'); ?>" autocomplete="off">
@@ -79,6 +79,9 @@ if (isset($_POST['new_username'])) {
 							</div>
 						</div>
 						<div class="input-container r">
+							<p class="left">
+								<?php printf('You hereby accept our <a href="%s" class="%s">terms of use</a>.', '#', 'modest-link active'); ?>
+							</p>
 							<input class="input-submit" type="submit" name="submit" value="<?php _e('Sign Up'); ?>">
 						</div>
 						<?php if (!empty($ErrorString)): ?>
@@ -90,8 +93,7 @@ if (isset($_POST['new_username'])) {
 								<?php echo $ErrorString; ?>
 							</div>
 						</div>
-						<?php endif; ?>
-						<?php if (!empty($OkayString)): ?>
+						<?php elseif (!empty($OkayString)): ?>
 						<div class="input-container input-message message-okay">
 							<div class="input-icon">
 								<i class="fa fa-fw fa-check"></i>

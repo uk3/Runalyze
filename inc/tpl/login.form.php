@@ -32,7 +32,7 @@ $HideForm = (isset($_POST['new_username']) || isset($_POST['send_username']));
 					</div>
 					<div class="input-container">
 						<div class="input-icon">
-							<i class="fa fa-fw fa-lg fa-key"></i>
+							<i class="fa fa-fw fa-lock"></i>
 						</div>
 						<div class="input-field">
 							<button class="modest-link inline over-input" type="button" id="password-link"><?php _e('Forgot password?'); ?></button>

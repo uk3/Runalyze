@@ -1785,6 +1785,11 @@ a:link {
   opacity: 1;
   border-bottom: 1px solid;
 }
+.modest-link.active {
+  font-size: inherit;
+  line-height: 1.3em;
+  opacity: 1;
+}
 .l {
   text-align: left;
 }
@@ -1793,6 +1798,12 @@ a:link {
 }
 .c {
   text-align: center;
+}
+.left {
+  float: left;
+}
+.right {
+  float: right;
 }
 .no-line-height {
   line-height: 1;
@@ -1942,7 +1953,7 @@ body {
   left: 0;
   float: left;
   width: 36px;
-  background: #b1e565;
+  background: #82b7c6;
   text-align: center;
 }
 .input-container .input-field {
@@ -1983,6 +1994,8 @@ form .input-container:last-child {
   cursor: pointer;
 }
 .input-field input {
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
   box-sizing: border-box;
   height: 36px;
   width: 100%;
