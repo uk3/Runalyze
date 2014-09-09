@@ -165,6 +165,7 @@ class GpsData {
 		$this->arrayForPace              = $this->loadArrayDataFrom($TrainingDataAsArray['arr_pace']);
 		$this->arrayForCadence           = $this->loadArrayDataFrom($TrainingDataAsArray['arr_cadence']);
 		$this->arrayForPower             = $this->loadArrayDataFrom($TrainingDataAsArray['arr_power']);
+		$this->arrayForPowerDistribution    = $this->loadArrayDataFrom($TrainingDataAsArray['arr_powerdistribution']);
 		$this->arrayForTemperature       = $this->loadArrayDataFrom($TrainingDataAsArray['arr_temperature']);
 		$this->arraySizes                = max(count($this->arrayForTime), count($this->arrayForLatitude));
 
@@ -190,6 +191,7 @@ class GpsData {
 			'arr_pace',
 			'arr_cadence',
 			'arr_power',
+			'arr_powerdistribution',
 			'arr_temperature'
 		);
 
@@ -218,6 +220,7 @@ class GpsData {
 		$this->Cache = new GpsDataCache($TrainingID, $String);
 
 		if ($this->Cache->isEmpty() && $String !== false) {
+			$this->Cache->set('powerdistribution_zones', $this->getPowerDistributionZonesAsFilledArrays());
 			$this->Cache->set('pulse_zones', $this->getPulseZonesAsFilledArrays());
 			$this->Cache->set('pace_zones', $this->getPaceZonesAsFilledArrays());
 			$this->Cache->set('rounds', $this->getRoundsAsFilledArray());
@@ -255,6 +258,7 @@ class GpsData {
 				count($this->arrayForPace),
 				count($this->arrayForCadence),
 				count($this->arrayForPower),
+				count($this->arrayForPowerDistribution),
 				count($this->arrayForTemperature)
 			);
 	}
@@ -473,7 +477,7 @@ class GpsData {
 	}
 
 	/**
-	 * Are information for elevation available?
+	 * Is information on power available?
 	 */
 	public function hasPowerData() {
 		return !empty($this->arrayForPower) && max($this->arrayForPower) > 0;
@@ -517,6 +521,24 @@ class GpsData {
 			return $array[$this->arrayIndex];
 
 		return ($array[$this->arrayIndex] - $array[$this->arrayLastIndex]);
+	}
+
+	/**
+	 * Get sum of complete step
+	 * @param array $array
+	 * @return float
+	 */
+	protected function getSumOfStep(&$array) {
+		if (empty($array) || !isset($array[$this->arrayIndex]))
+			return 0;
+
+		$stepArray = array_slice($array, $this->arrayLastIndex, ($this->arrayIndex - $this->arrayLastIndex), true);
+		$stepArray = array_filter($stepArray);
+
+		if (count($stepArray) == 0)
+			return 0;
+
+		return array_sum($stepArray);
 	}
 
 	/**
@@ -608,10 +630,17 @@ class GpsData {
 	}
 
 	/**
-	 * Get average pace since last step
+	 * Get average power since last step
 	 */
 	public function getAveragePowerOfStep() {
 		return round($this->getAverageOfStep($this->arrayForPower));
+	}
+
+	/**
+	 * Get average pace since last step
+	 */
+	public function getSumPowerDistributionOfStep() {
+		return $this->getSumOfStep($this->arrayForPowerDistribution);
 	}
 
 	/**
@@ -821,6 +850,44 @@ class GpsData {
 	}
 
 	/**
+	 * Get power distribution zones as sorted array
+	 * @return array
+	 */
+	public function getPowerDistributionZonesAsFilledArrays() {
+		if (!$this->hasPowerData())
+			return array();
+
+		if (!$this->Cache->isEmpty())
+			return $this->Cache->get('powerdistribution_zones');
+
+		$count = 0;
+		$maxzone = 0;
+		$Zones = array();
+		$this->startLoop();
+		$this->setStepSize( round($this->arraySizes / self::$NUM_STEPS_FOR_ZONES) );
+
+		while ($this->nextStep()) {
+			$count++;
+			$zone = floor($this->getAveragePowerOfStep() / 25);
+			if ($zone > $maxzone) $maxzone = $zone;
+			if (!isset($Zones[$zone]))
+				$Zones[$zone] = 1;
+			else
+				$Zones[$zone]++;
+		}
+		
+		ksort($Zones);
+
+		for ($zone = 0; $zone <= $maxzone; $zone++)
+			if (!isset($Zones[$zone]))
+				$Zones[$zone] = 0;
+			else
+				$Zones[$zone] = $Zones[$zone]/$count;
+
+		return $Zones;
+	}
+
+	/**
 	 * Get pace zones as sorted array filled with information for time, distance, hf-sum, num
 	 * @return array
 	 */
@@ -968,6 +1035,7 @@ class GpsData {
 			$Data['pace'][$index]                = $this->getCurrentPlotDataFor('pace');
 			$Data['cadence'][$index]             = $this->getCurrentPlotDataFor('cadence');
 			$Data['power'][$index]               = $this->getCurrentPlotDataFor('power');
+			$Data['powerdistribution'][$index]      = $this->getCurrentPlotDataFor('powerdistribution');
 			$Data['temperature'][$index]         = $this->getCurrentPlotDataFor('temperature');
 			$Data['elevation'][$index]           = $this->getCurrentPlotDataFor('elevation');
 			$Data['heartrate'][$index]           = $Heartrate;
@@ -1070,6 +1138,9 @@ class GpsData {
 			case "power":
 				$value = $this->getAveragePowerOfStep();
 				break;
+			case "powerdistribution":
+				$value = $this->getSumPowerDistributionOfStep();
+				break;
 			case "temperature":
 				$value = $this->getAverageTemperatureOfStep();
 				break;
@@ -1136,6 +1207,13 @@ class GpsData {
 	 */
 	public function getPlotDataForPower() {
 		return $this->getPlotDataFor('power');
+	}
+
+	/**
+	 * Get array as plot-data for power distribution
+	 */
+	public function getPlotDataForPowerDistribution() {
+		return $this->getPlotDataFor('powerdistribution');
 	}
 
 	/**
@@ -1257,6 +1335,9 @@ class GpsData {
 	 * @return array
 	 */
 	public function calculatePower() {
+		//error_log("calculatePower()");
+		//debug_print_backtrace();
+
 		if (!$this->hasDistanceData() || !$this->hasTimeData())
 			return array();
 
@@ -1266,7 +1347,9 @@ class GpsData {
 		$everyNthPoint  = self::$everyNthElevationPoint * ceil($this->arraySizes/1000);
 		$n              = $everyNthPoint;
 		$power          = array();
+		$powerdistribution = array();
 		$distance       = 0;
+		$cadence        = 0;
 		$grade          = 0;
 		$calcGrade      = $this->hasElevationData();
 
@@ -1296,23 +1379,78 @@ class GpsData {
 			}
 
 			$distance = $this->arrayForDistance[$i+1]-$this->arrayForDistance[$i];
+			$cadence = $this->arrayForCadence[$i];
 			$time = $this->arrayForTime[$i+1]-$this->arrayForTime[$i];
-			if ($time > 0) {
+			if ($time > 0 && $cadence > 0) {
 				$Vmps = $distance*1000/$time;
 				$Fw   = $Fwpr * $Vmps * $Vmps;
 				$Fsl  = $Fslp * $grade;
 				$power[] = round(max($PowerFactor * ($Frl + $Fw + $Fsl) * $Vmps, 0));
 				//error_log("(".$Frl." + ".$Fw." + ".$Fsl.") * ".$Vmps." = ".$power[$i]);
+				if (!isset($powerdistribution[floor($power[$i]/25)]))
+					$powerdistribution[floor($power[$i]/25)] = 0;
+				else
+					$powerdistribution[floor($power[$i]/25)]++;
 			} else {
 				$power[] = 0;
+				if (!isset($powerdistribution[0]))
+					$powerdistribution[0] = 0;
+				else
+					$powerdistribution[0]++;
 			}
 		}
 
 		$power[] = $power[$this->arraySizes-2]; /* XXX */
 
 		$this->arrayForPower = $power;
+		$this->arrayForPowerDistribution = $powerdistribution;
 
-		return $power;
+		return array($power, $powerdistribution);
+	}
+
+	/**
+	 * Compute normalized power
+	 * @see http://forum.slowtwitch.com/cgi-bin/gforum.cgi?post=3098028;
+	 * @return int
+	 */
+	public function normalizedPower($data = NULL) {
+		if (!$this->hasPowerData() || !$this->hasTimeData())
+			return 0;
+
+		if ($data != NULL)
+			$power = $data;
+		else
+			$power = $this->arrayForPower;
+		$time = $this->arrayForTime;
+		$curtime = $time[0];
+		$sumpower = 0;
+		$count = 0;
+		$p = array();
+		$poweravg = array();
+
+		for ($i = 0; $i < $this->arraySizes-1 && $time[$i]-$curtime < 30; $i++) {
+			$pp = pow($power[$i],4);
+			array_push($p, $pp);
+			$sumpower += $pp;
+			$count++;
+		}
+		array_push($poweravg, $sumpower/$count);
+		while ($i < $this->arraySizes-1) {
+			$curtime = $time[$i];
+			for (; $i < $this->arraySizes-1 && $time[$i]-$curtime < 1; $i++) {
+				$pp = pow($power[$i],4);
+				array_push($p, $pp);
+				$sumpower += $pp;
+				$sumpower -= array_shift($p);
+			}
+			array_push($poweravg, $sumpower/$count);
+		}
+
+		//error_log(array_sum($poweravg));
+		//error_log(count($poweravg));
+		//error_log(array_sum($poweravg)/count($poweravg));
+		//error_log(pow(array_sum($poweravg)/count($poweravg), 0.25));
+		return round(pow(array_sum($poweravg)/count($poweravg), 0.25));
 	}
 
 	/**

@@ -238,6 +238,7 @@ $CLASSMAP = array(
 'TrainingPlotPace' => 'training/plot/class.TrainingPlotPace.php',
 'TrainingPlotPacePulse' => 'training/plot/class.TrainingPlotPacePulse.php',
 'TrainingPlotPower' => 'training/plot/class.TrainingPlotPower.php',
+'TrainingPlotPowerDistribution' => 'training/plot/class.TrainingPlotPowerDistribution.php',
 'TrainingPlotPulse' => 'training/plot/class.TrainingPlotPulse.php',
 'TrainingPlotTemperature' => 'training/plot/class.TrainingPlotTemperature.php',
 'FormularInputSearchTimeRange' => 'training/search/class.FormularInputSearchTimeRange.php',
@@ -280,3 +281,4 @@ $CLASSMAP = array(
 'TableZonesHeartrate' => 'training/view/section/table/class.TableZonesHeartrate.php',
 'TableZonesPace' => 'training/view/section/table/class.TableZonesPace.php',
 );
+?>

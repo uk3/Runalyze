@@ -210,6 +210,7 @@ class ConfigTabDataset extends ConfigTab {
 			'arr_pace'	=> '',
 			'arr_cadence'	=> '',
 			'arr_power'	=> '',
+			'arr_powerdistribution'	=> '',
 			'arr_temperature'	=> '',
 			'accountid'	=> SessionAccountHandler::getId(),
 			'creator'	=> '',

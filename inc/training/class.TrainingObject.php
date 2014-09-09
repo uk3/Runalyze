@@ -172,7 +172,7 @@ class TrainingObject extends DataObject {
 
 		Helper::recalculateStartTime();
 
-		if ($this->Sport()->usesPower() && CONF_COMPUTE_POWER)
+		if ($this->Sport()->usesPower())
 			$this->calculatePower();
 	}
 
@@ -199,6 +199,9 @@ class TrainingObject extends DataObject {
 		}
 
 		Helper::recalculateStartTime();
+
+		if ($this->Sport()->usesPower())
+			$this->calculatePower();
 	}
 
 	/**
@@ -301,12 +304,33 @@ class TrainingObject extends DataObject {
 	 * Calculate power
 	 */
 	private function calculatePower() {
+		$updatecache = 0;
 		$GPS = new GpsData($this->getArray());
-		$data = $GPS->calculatePower();
 
-		$this->updateValue('arr_power', implode(self::$ARR_SEP, $data));
-		$this->updateValue('power', $GPS->averagePower());
-		$this->updateValue('gps_cache_object', '');
+		if (!$GPS->hasPowerData() || $this->getIsVirtualPower()) {
+			if (CONF_COMPUTE_POWER) {
+				$data = $GPS->calculatePower();
+				$this->updateValue('isvirtualpower', 1);
+
+				$this->updateValue('arr_power', implode(self::$ARR_SEP, $data[0]));
+				$this->updateValue('arr_powerdistribution', implode(self::$ARR_SEP, $data[1]));
+
+				$updatecache = 1;
+			}
+		}
+
+		if (!($this->getPowerVI() > 0) || $updatecache) {
+			$ap = $GPS->averagePower();
+			$np = $GPS->normalizedPower();
+			$vi = round($np/$ap, 2);
+			$this->updateValue('power', $ap);
+			$this->updateValue('normalizedpower', $np);
+			$this->updateValue('vipower', $vi);
+			$updatecache = 1;
+		}
+
+		if ($updatecache)
+			$this->updateValue('gps_cache_object', '');
 	}
 
 	/**
@@ -322,7 +346,7 @@ class TrainingObject extends DataObject {
 				$this->updateValue('elevation', $this->get('elevation_calculated'));
 			}
 
-			if ($this->Sport()->usesPower() && CONF_COMPUTE_POWER)
+			if ($this->Sport()->usesPower())
 				$this->calculatePower();
 		}
 	}
@@ -836,6 +860,42 @@ class TrainingObject extends DataObject {
 	 */
 	public function getPower() { return $this->get('power'); }
 
+	/**
+	 * Set normalized power
+	 * cf. http://www.slowtwitch.com/Training/Cycling/How_to_Analyze_a_Power_File_4311.html
+	 * @param int $power power
+	 */
+	public function setNormalizedPower($power) { return $this->set('normalizedpower', $power); }
+	/**
+	 * Get normalized power
+	 * cf. http://www.slowtwitch.com/Training/Cycling/How_to_Analyze_a_Power_File_4311.html
+	 * @return int power value
+	 */
+	public function getNormalizedPower() { return $this->get('normalizedpower'); }
+
+	/**
+	 * Set power VI
+	 * cf. http://www.slowtwitch.com/Training/Cycling/How_to_Analyze_a_Power_File_4311.html
+	 * @param int $power power
+	 */
+	public function setPowerVI($power) { return $this->set('vipower', $power); }
+	/**
+	 * Get power VI
+	 * cf. http://www.slowtwitch.com/Training/Cycling/How_to_Analyze_a_Power_File_4311.html
+	 * @return int power value
+	 */
+	public function getPowerVI() { return $this->get('vipower'); }
+
+	/**
+	 * Set virtual power flag
+	 * @param bool $power flag
+	 */
+	public function setIsVirtualPower($flag) { return $this->set('isvirtualpower', $flag); }
+	/**
+	 * Is this virtual power?
+	 * @return bool power value
+	 */
+	public function getIsVirtualPower() { return $this->get('isvirtualpower'); }
 
 	/**
 	 * Set weatherid
@@ -1127,6 +1187,23 @@ class TrainingObject extends DataObject {
 	 * @return bool
 	 */
 	public function hasArrayPower() { return strlen($this->get('arr_power')) > 0; }
+
+
+	/**
+	 * Set array for power distribution
+	 * @param array $array
+	 */
+	public function setArrayPowerDistribution($array) { $this->setArrayFor('arr_powerdistribution', $array); }
+	/**
+	 * Get array for power distribution
+	 * @return array
+	 */
+	public function getArrayPowerDistribution() { return $this->getArrayFor('arr_powerdistribution'); }
+	/**
+	 * Has array for power distribution?
+	 * @return bool
+	 */
+	public function hasArrayPowerDistribution() { return strlen($this->get('arr_powerdistribution')) > 0; }
 
 
 	/**

@@ -305,6 +305,17 @@ class TrainingDataView {
 	}
 
 	/**
+	 * Get normalized power
+	 * @return string normalizedpower with unit
+	 */
+	public function getNormalizedPower() {
+		if ($this->Object->getNormalizedPower() > 0)
+			return $this->Object->getNormalizedPower().'&nbsp;W';
+
+		return '';
+	}
+
+	/**
 	 * Get calories with unit
 	 * @return string
 	 */

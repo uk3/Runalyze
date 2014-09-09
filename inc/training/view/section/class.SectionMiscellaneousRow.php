@@ -36,8 +36,10 @@ class SectionMiscellaneousRow extends TrainingViewSectionRowTabbedPlot {
 		if ($this->Training->hasArrayCadence())
 			$this->addRightContent('cadence', __('Cadence plot'), new TrainingPlotCadence($this->Training));
 
-		if ($this->Training->hasArrayPower())
+		if ($this->Training->hasArrayPower()) {
 			$this->addRightContent('power', __('Power plot'), new TrainingPlotPower($this->Training));
+			$this->addRightContent('powerDistribution', __('Power distribution'), new TrainingPlotPowerDistribution($this->Training));
+		}
 
 		if ($this->Training->hasArrayTemperature())
 			$this->addRightContent('temperature', __('Temperature plot'), new TrainingPlotTemperature($this->Training));
@@ -81,11 +83,19 @@ class SectionMiscellaneousRow extends TrainingViewSectionRowTabbedPlot {
 			$Cadence = new BoxedValue(Helper::Unknown($this->Training->Cadence()->value(), '-'), $this->Training->Cadence()->unitAsString(), $this->Training->Cadence()->label());
 			$Cadence->defineAsFloatingBlock('w50');
 
-			$Power = new BoxedValue(Helper::Unknown($this->Training->getPower(), '-'), 'W', __('Power'));
-			$Power->defineAsFloatingBlock('w50');
+			$VI = new BoxedValue(Helper::Unknown($this->Training->getPowerVI(), '-'), '', __('VI'));
+			$VI->defineAsFloatingBlock('w50');
+
+			$AP = new BoxedValue(Helper::Unknown($this->Training->getPower(), '-'), 'W', __('Average Power'));
+			$AP->defineAsFloatingBlock('w50');
+
+			$NP = new BoxedValue(Helper::Unknown($this->Training->getNormalizedPower(), '-'), 'W', __('Normalized Power'));
+			$NP->defineAsFloatingBlock('w50');
 
 			$this->BoxedValues[] = $Cadence;
-			$this->BoxedValues[] = $Power;
+			$this->BoxedValues[] = $VI;
+			$this->BoxedValues[] = $AP;
+			$this->BoxedValues[] = $NP;
 		}
 	}
 
