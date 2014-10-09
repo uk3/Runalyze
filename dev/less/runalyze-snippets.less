@@ -10,6 +10,18 @@ p {
 	margin: 0 0 1em;
 }
 
+p,
+.message {
+	&.topspace {
+		margin-top: 2em;
+	}
+
+	> p:last-child,
+	&.last {
+		margin-bottom: 0;
+	}
+}
+
 button {
 	cursor: pointer;
 	border: none;
@@ -38,6 +50,10 @@ a, a:link {
 	border-bottom: thin dotted;
 	opacity: 0.5;
 	letter-spacing: 1px;
+
+	&.solid {
+		opacity: 1;
+	}
 
 	&:hover {
 		opacity: 1;
@@ -70,4 +86,8 @@ a, a:link {
 
 .no-line-height {
 	line-height: 1;
+}
+
+.clear {
+	clear: both;
 }

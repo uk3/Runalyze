@@ -1753,6 +1753,16 @@ h3 {
 p {
   margin: 0 0 1em;
 }
+p.topspace,
+.message.topspace {
+  margin-top: 2em;
+}
+p > p:last-child,
+.message > p:last-child,
+p.last,
+.message.last {
+  margin-bottom: 0;
+}
 button {
   cursor: pointer;
   border: none;
@@ -1781,6 +1791,9 @@ a:link {
   opacity: 0.5;
   letter-spacing: 1px;
 }
+.modest-link.solid {
+  opacity: 1;
+}
 .modest-link:hover {
   opacity: 1;
   border-bottom: 1px solid;
@@ -1807,6 +1820,9 @@ a:link {
 }
 .no-line-height {
   line-height: 1;
+}
+.clear {
+  clear: both;
 }
 body {
   font: 300 14px "Open Sans", "Segeo UI", Helvetica, Arial, sans-serif;
@@ -1862,9 +1878,11 @@ body {
   color: #ffffff;
 }
 #footer a {
+  display: inline-block;
   text-shadow: 0 1px 1px #000;
   font-weight: 600;
-  margin: 0 10px;
+  margin: 0 5px;
+  padding: 0 5px;
   transition: color 0.5s;
 }
 #footer a:link,
@@ -1926,6 +1944,45 @@ body {
   margin-left: 50px;
   margin-right: 10px;
 }
+.message {
+  margin: 0 0 1em;
+  background-color: #f7f7f7;
+}
+.message p {
+  padding: 12px;
+}
+.message > .title {
+  line-height: 1;
+  margin-bottom: 0;
+  padding: 6px 12px;
+  font-weight: bold;
+  color: #ffffff;
+  background-color: #cccccc;
+}
+.message.message-error {
+  background-color: #f7e3e0;
+}
+.message.message-error > .title {
+  background-color: #c74734;
+}
+.message.message-warning {
+  background-color: #fef7d9;
+}
+.message.message-warning > .title {
+  background-color: #fbca04;
+}
+.message.message-note {
+  background-color: #edf4fc;
+}
+.message.message-note > .title {
+  background-color: #84b6eb;
+}
+.message.message-okay {
+  background-color: #dcf0dc;
+}
+.message.message-okay > .title {
+  background-color: #159818;
+}
 #login {
   margin-top: 0;
   transition: margin 1s ease;
@@ -1934,9 +1991,11 @@ body {
   width: 400px;
   margin: 0 auto;
 }
-.login-back {
-  position: relative;
-  top: -1em;
+.content-carousel {
+  display: none;
+}
+.content-carousel.active {
+  display: block;
 }
 .input-container {
   position: relative;
@@ -1946,15 +2005,6 @@ body {
 }
 .input-container.bottom-margin {
   margin-bottom: 20px;
-}
-.input-container .input-icon {
-  position: absolute;
-  z-index: 2;
-  left: 0;
-  float: left;
-  width: 36px;
-  background: #82b7c6;
-  text-align: center;
 }
 .input-container .input-field {
   position: relative;
@@ -1968,6 +2018,30 @@ body {
 form .input-container:last-child {
   margin-bottom: 0;
 }
+.input-container .input-icon,
+.input-container-checkbox .input-icon {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  float: left;
+  width: 36px;
+  text-align: center;
+}
+.input-field input,
+.input-container-checkbox .input-checkbox-text {
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  height: 36px;
+  width: 100%;
+  padding: 0 10px 0 36px;
+  font-weight: 300;
+  letter-spacing: 1px;
+}
+.input-field input {
+  border: none;
+  background: #f3f6f6;
+}
 .input-container-checkbox {
   position: relative;
   height: 30px;
@@ -1976,11 +2050,6 @@ form .input-container:last-child {
   font-size: 13px;
   color: #999;
 }
-.input-container-checkbox .input-icon {
-  display: inline-block;
-  width: 36px;
-  text-align: center;
-}
 .input-container-checkbox.checked {
   color: #000;
 }
@@ -1988,25 +2057,10 @@ form .input-container:last-child {
   content: "\f205";
 }
 .input-container-checkbox .input-checkbox-text {
-  display: inline;
+  height: 30px;
 }
 .input-container-checkbox label {
   cursor: pointer;
-}
-.input-field input {
-  -moz-box-sizing: border-box;
-  -webkit-box-sizing: border-box;
-  box-sizing: border-box;
-  height: 36px;
-  width: 100%;
-  padding: 0 10px 0 50px;
-  border: none;
-  background: #f3f6f6;
-  font-weight: 300;
-  letter-spacing: 1px;
-}
-.message-error {
-  color: #751000;
 }
 .input-message {
   height: auto;
@@ -2035,30 +2089,6 @@ form .input-container:last-child {
   background: #c1321d;
   color: #ffffff;
   font-weight: normal;
-}
-.animation-fade-in-out {
-  overflow: hidden;
-  visibility: visible;
-  opacity: 1;
-  transition: opacity 0.5s linear;
-}
-.animation-fade-in-out .panel-content {
-  max-height: 800px;
-  overflow-y: scroll;
-}
-.animation-fade-in-out.hidden {
-  display: block;
-  visibility: hidden;
-  opacity: 0;
-  transition: visibility 0s 0.5s, opacity 0.5s linear;
-}
-.animation-fade-in-out.hidden  > div {
-  margin-top: -1000px;
-  transition: margin-top 0s 0.5s linear;
-}
-.animation-fade-in-out.hidden .panel-content {
-  max-height: 0;
-  transition: max-height 0s 0.5s linear;
 }
 .hover-spin-icon:hover .fa {
   -webkit-animation: spin 1s 1 ease-in-out;

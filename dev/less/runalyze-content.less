@@ -32,3 +32,38 @@
 	margin-left: 50px;
 	margin-right: 10px;
 }
+
+.message {
+	margin: 0 0 1em;
+	background-color: @color-message-text;
+
+	p {
+		padding: 12px;
+	}
+
+	> .title {
+		line-height: 1;
+		margin-bottom: 0;
+		padding: 6px 12px;
+		font-weight: bold;
+		color: @white;
+		background-color: @color-message-text-title;
+	}
+
+	&.message-error {
+		background-color: @color-message-err;
+		> .title { background-color: @color-message-err-title; }
+	}
+	&.message-warning {
+		background-color: @color-message-warn;
+		> .title { background-color: @color-message-warn-title; }
+	}
+	&.message-note {
+		background-color: @color-message-note;
+		> .title { background-color: @color-message-note-title; }
+	}
+	&.message-okay {
+		background-color: @color-message-ok;
+		> .title { background-color: @color-message-ok-title; }
+	}
+}

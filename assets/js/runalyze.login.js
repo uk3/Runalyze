@@ -1,26 +1,23 @@
 (function($){
+	function carousel(target, page) {
+		return (function() {
+			var $car = $(".carousel[data-carousel='"+target+"']");
+			var url = (page == 'login') ? '' : '?'+page;
+
+			$car.find(".content-carousel.active").removeClass('active');
+			$car.find(".content-carousel[data-page='"+page+"']").addClass('active');
+
+			history.pushState({}, '', 'login.php'+url);
+		});
+	}
+
 	$(document).ready(function(){
-		$("#register-link").bind('click', function(){
-			$("#register").removeClass('hidden');
-			$("#login").css('margin-top', -$("#login").outerHeight());
-		});
-
-		$("#password-link").bind('click', function(){
-			$("#password").removeClass('hidden');
-			$("#login").css('margin-top', -$("#login").outerHeight());
-		});
-
-		$("#register .login-back, #password .login-back").bind('click', function(){
-			$("#register, #password").addClass('hidden');
-			$("#login").css('margin-top', 0);
-		});
+		$("#register-link").bind('click', carousel('login', 'register') );
+		$("#password-link").bind('click', carousel('login', 'password') );
+		$(".login-back").bind('click', carousel('login', 'login') );
 
 		$(".button-toggle").bind('click', function(){
 			$("#"+$(this).attr('data-toggle')).toggleClass('hidden');
 		});
-
-		if ($("#login").is('.hidden')) {
-			$("#login").css('margin-top', -$("#login").outerHeight()).removeClass('hidden');
-		}
 	});
 })(jQuery);

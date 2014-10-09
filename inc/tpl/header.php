@@ -12,7 +12,7 @@
 
 	<link href='http://fonts.googleapis.com/css?family=Open+Sans:400,300' rel='stylesheet' type='text/css'>
 
-	<title>Runalyze</title>
+	<title>Runalyze v<?php echo RUNALYZE_VERSION; ?></title>
 </head>
 
 <body class="">
