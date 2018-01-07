@@ -6,7 +6,7 @@ rc=$?
 
 if [ $rc -eq 0 ]; then
     cd /opt/app-root/src/
-    if [ "$HTTPS" -eq "on" ]; then
+    if [ "$HTTPS" == "on" ]; then
         echo "Setting default HTTPS"
         echo "SetEnv HTTPS on" >> web/.htaccess
     fi
