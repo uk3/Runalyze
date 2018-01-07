@@ -1,0 +1,18 @@
+#!/bin/bash
+echo "Before assembling"
+
+/usr/libexec/s2i/assemble
+rc=$?
+
+if [ $rc -eq 0 ]; then
+    echo "Downloading .htaccess ..."
+    curl -o .htaccess http://homepage.univie.ac.at/gudrun.schoellhammer/runalyze_htaccess.txt
+    echo "Installing some Node stuff"
+    cd /opt/app-root/src/
+    npm install
+    node_modules/gulp-cli/bin/gulp.js
+else
+    echo "After failed assembling"
+fi
+
+exit $rc
