@@ -5,10 +5,9 @@ echo "Before assembling"
 rc=$?
 
 if [ $rc -eq 0 ]; then
-    echo "Downloading .htaccess ..."
-    curl -o .htaccess http://homepage.univie.ac.at/gudrun.schoellhammer/runalyze_htaccess.txt
-    echo "Installing some Node stuff"
     cd /opt/app-root/src/
+    cp .htaccess.dist .htaccess
+    echo "Installing some Node stuff"
     npm install
     node_modules/gulp-cli/bin/gulp.js
 else
