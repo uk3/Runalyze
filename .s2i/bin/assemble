@@ -6,7 +6,10 @@ rc=$?
 
 if [ $rc -eq 0 ]; then
     cd /opt/app-root/src/
-    cp .htaccess.dist .htaccess
+    if [ "$HTTPS" -eq "on" ]; then
+        echo "Setting default HTTPS"
+        echo "SetEnv HTTPS on" >> web/.htaccess
+    fi
     echo "Installing some Node stuff"
     npm install
     node_modules/gulp-cli/bin/gulp.js
