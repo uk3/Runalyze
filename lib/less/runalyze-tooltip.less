@@ -14,7 +14,7 @@
 
 .fade {
 	opacity: 0;
-	transition: opacity 0.3s linear;
+	//transition: opacity 0.3s linear;
 }
 
 .fade.in {
@@ -29,6 +29,11 @@
 	font-size: @tooltip-font-size;
 	opacity: 0;
 	visibility: visible;
+}
+
+.overlay .tooltip,
+.fullscreen .tooltip {
+	z-index: @z-index-tooltip-overlay;
 }
 
 .tooltip.in {

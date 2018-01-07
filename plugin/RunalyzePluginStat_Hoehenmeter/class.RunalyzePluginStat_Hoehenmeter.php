@@ -4,7 +4,10 @@
  * @package Runalyze\Plugins\Stats
  */
 
-use Runalyze\Configuration;
+use Runalyze\Model\Activity;
+use Runalyze\View\Activity\Linker;
+use Runalyze\Activity\Distance;
+use Runalyze\Activity\Elevation;
 
 $PLUGINKEY = 'RunalyzePluginStat_Hoehenmeter';
 /**
@@ -14,75 +17,45 @@ $PLUGINKEY = 'RunalyzePluginStat_Hoehenmeter';
  */
 class RunalyzePluginStat_Hoehenmeter extends PluginStat {
 	private $ElevationData = array();
-	private $SumData       = array();
-	private $UpwardData    = array();
+	private $IsFirstChangeTable = true;
 
-	/**
-	 * Name
-	 * @return string
-	 */
 	final public function name() {
 		return __('Elevation');
 	}
 
-	/**
-	 * Description
-	 * @return string
-	 */
 	final public function description() {
 		return __('Your steepest activities and an overview of your cumulated elevation.');
 	}
 
-	/**
-	 * Init data 
-	 */
 	protected function prepareForDisplay() {
 		$this->setSportsNavigation(true, true);
-		$this->setYearsNavigation(true, true);
+		$this->setYearsNavigation(true, true, true);
 
 		$this->setHeaderWithSportAndYear();
 
 		$this->initElevationData();
-		$this->initSumData();
-		$this->initUpwardData();
 	}
 
-	/**
-	 * Default year
-	 * @return int
-	 */
 	protected function defaultYear() {
 		return -1;
 	}
 
-	/**
-	 * Title for all years
-	 * @return string
-	 */
 	protected function titleForAllYears() {
 		return __('All years');
 	}
 
-	/**
-	 * Display the content
-	 * @see PluginStat::displayContent()
-	 */
 	protected function displayContent() {
 		if ($this->year == -1)
 			$this->displayElevationData();
 
-		$this->displaySumData();
-		$this->displayUpwardData();
+		$this->displayActivityRankings();
 
 		echo HTML::clearBreak();
 	}
 
-	/**
-	 * Display the table with summed data for every month 
-	 */
 	private function displayElevationData() {
 		echo '<table class="fullwidth zebra-style r">';
-		echo '<thead>'.HTML::monthTr(8, 1).'</thead>';
+		echo '<thead>'.HTML::monthTr(8, 1, 'td', true).'</thead>';
 		echo '<tbody>';
 
 		if (empty($this->ElevationData))
@@ -90,92 +63,119 @@ class RunalyzePluginStat_Hoehenmeter extends PluginStat {
 		foreach ($this->ElevationData as $y => $Data) {
 			echo('
 				<tr>
-					<td class="b l">'.$y.'</td>'.NL);
-
+					<td class="b l">'.$y.'</td>');
+			$summarized = 0;
 			for ($m = 1; $m <= 12; $m++) {
 				if (isset($Data[$m]) && $Data[$m]['elevation'] > 0) {
 					$Link = new SearchLink();
 					$Link->fromTo(mktime(0,0,0,$m,1,$y), mktime(0,0,0,$m+1,0,$y));
 					$Link->sortBy('elevation');
+					$summarized += $Data[$m]['elevation'];
 
-					echo '<td>'.$Link->link($Data[$m]['elevation'].'&nbsp;m').'</td>';
+					echo '<td>'.$Link->link(Elevation::format($Data[$m]['elevation'])).'</td>';
 				} else {
 					echo HTML::emptyTD();
 				}
 			}
+			echo '<td>'.Elevation::format($summarized).'</td>';
 
-			echo '</tr>'.NL;
+
+			echo '</tr>';
 		}
 
 		echo '</tbody></table>';
 	}
 
-	/**
-	 * Display the table for routes with highest elevation
-	 */
-	private function displaySumData() {
-		echo '<table style="width:48%;" style="margin:0 5px;" class="left zebra-style">';
-		echo '<thead><tr class="b c"><th colspan="4">'.__('Most elevation').'</th></tr></thead>';
-		echo '<tbody>';
+	private function displayActivityRankings() {
+	    echo '<div class="c blocklist blocklist-change-menu blocklist-width-auto margin-top-4x">
+                <a class="change triggered" href="#elevation-ranking-elevation" target="elevation-rankings"><strong><i class="fa fa-fw fa-area-chart"></i> '.__('Most elevation').'</strong></a>
+                <a class="change" href="#elevation-ranking-grade" target="elevation-rankings"><strong><i class="fa fa-fw fa-line-chart"></i> '.__('Steepest routes').'</strong></a>
+                <a class="change" href="#elevation-ranking-cs" target="elevation-rankings"><strong><i class="fa fa-fw fa-trophy"></i> '.__('Highest Climb Score').'</strong></a>
+            </div>';
 
-		if (empty($this->SumData))
-			echo '<tr><td colspan="4"><em>'.__('No routes found.').'</em></td></tr>';
+	    echo '<div id="elevation-rankings">';
 
-		foreach ($this->SumData as $Data) {
-			$Training = new TrainingObject($Data);
+        $this->displayData(
+            __('Most elevation'), 'elevation',
+            $this->getData('elevation'),
+            function ($activityData) {
+                $grade = $activityData['distance'] > 0 ? $activityData['elevation'] / $activityData['distance'] : 0;
 
-			if (strlen($Data['route']) == 0)
-				$Data['route'] = '<em>'.__('unknown route').'</em>';
+                return Elevation::format($activityData['elevation']).'<br>
+					<small>'.round($grade/10, 2).'&nbsp;&#37;,&nbsp;'.Distance::format($activityData['distance']).'</small>';
+            }
+        );
 
-			echo('
-			<tr>
-				<td class="small">'.$Training->DataView()->getDateAsWeeklink().'</td>
-				<td>'.$Training->Linker()->linkWithSportIcon().'</td>
-				<td title="'.($Data['comment'] != "" ? $Data['comment'].': ' : '').$Data['route'].'">'.$Data['route'].'</td>
-				<td class="r">'.$Data['elevation'].'&nbsp;m</td>
-			</tr>
-				'.NL);
-		}
+	    $this->displayData(
+            __('Steepest routes'), 'grade',
+            $this->getData('gradient'),
+            function ($activityData) {
+                return round($activityData['gradient']/10, 2).'&nbsp;&#37;<br>
+					<small>'.Elevation::format($activityData['elevation']).',&nbsp;'.Distance::format($activityData['distance']).'</small>';
+            }
+        );
 
-		echo '</tbody></table>';
+        $this->displayData(
+            __('Highest Climb Score'), 'cs',
+            $this->getData('climb_score'),
+            function ($activityData) {
+                return '<small>'.round($activityData['gradient']/10, 2).'&nbsp;&#37;<br>
+					'.Elevation::format($activityData['elevation']).',&nbsp;'.Distance::format($activityData['distance']).'</small>';
+            }
+        );
+
+        echo '</div>';
 	}
 
+    private function displayData($title, $changeId, array $data, $functionToDisplayElevation) {
+        echo '<table class="fullwidth zebra-style more-padding change" id="elevation-ranking-'.$changeId.'"'.(!$this->IsFirstChangeTable ? ' style="display:none;"' : '').'>';
+        echo '<thead><tr class="b c"><th colspan="4">'.$title.'</th><th><abbr title="Climb Score">CS</abbr></th></tr></thead>';
+        echo '<tbody>';
+
+        if (empty($data)) {
+            echo '<tr><td colspan="5"><em>'.__('No routes found.').'</em></td></tr>';
+        } else {
+            foreach ($data as $activityData) {
+                $Activity = new Activity\Entity($activityData);
+                $Linker = new Linker($Activity);
+
+                echo '<tr>
+                    <td class="small">'.$Linker->weekLink().'</td>
+                    <td>'.$Linker->linkWithSportIcon().'</td>
+                    <td>'.$this->labelFor($activityData['route'], $activityData['title']).'</td>
+                    <td class="r">
+                        '.$functionToDisplayElevation($activityData).'</small>
+                    </td>
+                    <td class="r vc"><a class="window" href="activity/'.$activityData['id'].'/climb-score">'.$activityData['climb_score'].'</a></td>
+                </tr>';
+            }
+        }
+
+        echo '</tbody></table>';
+
+        $this->IsFirstChangeTable = false;
+    }
+
 	/**
-	 * Display the table for routes with procentual highest elevation
+	 * Get label
+	 * @param string $route
+	 * @param string $title
+	 * @return string
 	 */
-	private function displayUpwardData() {
-		echo '<table style="width:48%;" style="margin:0 5px;" class="right zebra-style">';
-		echo '<thead><tr class="b c"><th colspan="4">'.__('Steepest routes').'</th></tr></thead>';
-		echo '<tbody>';
+	private function labelFor($route, $title) {
+		if ($route != '') {
+			if ($title != '') {
+				return $route.' (<em>'.$title.'</em>)';
+			}
 
-		if (empty($this->UpwardData))
-			echo '<tr><td colspan="4"><em>'.__('No routes found.').'</em></td></tr>';
-
-		foreach ($this->UpwardData as $Data) {
-			$Training = new TrainingObject($Data);
-
-			if (strlen($Data['route']) == 0)
-				$Data['route'] = '<em>'.__('unknown route').'</em>';
-
-			echo('
-			<tr>
-				<td class="small">'.$Training->DataView()->getDateAsWeeklink().'</td>
-				<td>'.$Training->Linker()->linkWithSportIcon().'</td>
-				<td title="'.($Data['comment'] != "" ? $Data['comment'].': ' : '').$Data['route'].'">'.$Data['route'].'</td>
-				<td class="r">
-					'.round($Data['steigung']/10, 2).'&nbsp;&#37;<br>
-					<small>('.$Data['elevation'].'&nbsp;m/'.$Data['distance'].'&nbsp;km</small>
-				</td>
-			</tr>
-				'.NL);
+			return $route;
+		} elseif ($title != '') {
+			return '<em>'.$title.'</em>';
 		}
 
-		echo '</tbody></table>';
+		return '<em>'.__('unlabeled').'</em>';
 	}
 
-	/**
-	 * Initialize $this->ElevationData
-	 */
 	private function initElevationData() {
 		$result = DB::getInstance()->query('
 			SELECT
@@ -184,8 +184,9 @@ class RunalyzePluginStat_Hoehenmeter extends PluginStat {
 				YEAR(FROM_UNIXTIME(`time`)) as `year`,
 				MONTH(FROM_UNIXTIME(`time`)) as `month`
 			FROM `'.PREFIX.'training`
-			WHERE `elevation` > 0 '.$this->getSportAndYearDependenceForQuery().'
-			GROUP BY `year`, `month`')->fetchAll();
+			WHERE `accountid`='.SessionAccountHandler::getId().' AND `elevation` > 0 '.$this->getSportAndYearDependenceForQuery().'
+			GROUP BY `year`, `month`'
+		)->fetchAll();
 
 		foreach ($result as $dat) {
 			$this->ElevationData[$dat['year']][$dat['month']] = array(
@@ -195,41 +196,26 @@ class RunalyzePluginStat_Hoehenmeter extends PluginStat {
 		}
 	}
 
-	/**
-	 * Initialize $this->SumData
-	 */
-	private function initSumData() {
-		$this->SumData = DB::getInstance()->query('
+	private function getData($order, $limit = 10) {
+	    return DB::getInstance()->query('
 			SELECT
-				`time`, `sportid`, `id`, `elevation`, `route`, `comment`, `s`, `distance`
+				`'.PREFIX.'training`.`id`,
+				`'.PREFIX.'training`.`time`,
+				`'.PREFIX.'training`.`sportid`,
+				`'.PREFIX.'training`.`title`,
+				`'.PREFIX.'training`.`s`,
+				`'.PREFIX.'training`.`climb_score`,
+				`'.PREFIX.'training`.`percentage_hilly`,
+				`'.PREFIX.'route`.`name` as `route`,
+				`'.PREFIX.'route`.`distance`,
+				`'.PREFIX.'route`.`elevation`,
+				(`'.PREFIX.'route`.`elevation`/`'.PREFIX.'route`.`distance`) as `gradient`
 			FROM `'.PREFIX.'training`
-			WHERE `elevation` > 0 '.$this->getSportAndYearDependenceForQuery().'
-			ORDER BY `elevation` DESC
-			LIMIT 10')->fetchAll();
-	}
-
-	/**
-	 * Initialize $this->UpwardData
-	 */
-	private function initUpwardData() {
-		$this->UpwardData = DB::getInstance()->query('
-			SELECT
-				`time`, `sportid`, `id`, `elevation`, `route`, `comment`,
-				(`elevation`/`distance`) as `steigung`, `distance`, `s`
-			FROM `'.PREFIX.'training`
-			WHERE `elevation` > 0 '.$this->getSportAndYearDependenceForQuery().'
-			ORDER BY `steigung` DESC
-			LIMIT 10')->fetchAll();
-	}
-
-	/**
-	 * Get where query for sport
-	 * @return string
-	 */
-	/*private function andSportWhere() {
-		if (!$this->config['all_sports']['var'])
-			return 'AND `sportid`="'.Configuration::General()->runningSport().'"';
-
-		return '';
-	}*/
+			LEFT JOIN `'.PREFIX.'route` ON `'.PREFIX.'training`.`routeid`=`'.PREFIX.'route`.`id`
+			WHERE `'.PREFIX.'training`.`accountid`="'.SessionAccountHandler::getId().'" AND
+				`'.PREFIX.'training`.`elevation` > 0 '.$this->getSportAndYearDependenceForQuery().'
+			ORDER BY `'.$order.'` DESC
+			LIMIT '.(int)$limit
+        )->fetchAll();
+    }
 }

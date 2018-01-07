@@ -13,19 +13,19 @@ class ConfigTabs {
 	 * URL for config-window
 	 * @var string
 	 */
-	public static $CONFIG_URL = 'call/window.config.php';
+	public static $CONFIG_URL = 'settings';
 
 	/**
 	 * HTML-ID for div
 	 * @var string
 	 */
-	static public $TABS_ID = 'config-tabs';
+	public static $TABS_ID = 'config-tabs';
 
 	/**
 	 * Messages to show after submit
 	 * @var array
 	 */
-	static private $Messages = array();
+	private static $Messages = array();
 
 	/**
 	 * Internal array with all tabs
@@ -43,13 +43,13 @@ class ConfigTabs {
 	 * Add message after submit
 	 * @param string $HTMLcode HTML::info() or HTML::text() or HTML::warning() or HTML::error()
 	 */
-	static public function addMessage($HTMLcode) {
+	public static function addMessage($HTMLcode) {
 		self::$Messages[] = $HTMLcode;
 	}
 
 	/**
 	 * Add a tab and set it as the default one
-	 * @param ConfigTab $Tab 
+	 * @param ConfigTab $Tab
 	 */
 	public function addDefaultTab(ConfigTab $Tab) {
 		$this->defaultKey = $Tab->getKey();
@@ -58,26 +58,14 @@ class ConfigTabs {
 
 	/**
 	 * Add a tab
-	 * @param ConfigTab $Tab 
+	 * @param ConfigTab $Tab
 	 */
 	public function addTab(ConfigTab $Tab) {
 		$this->Tabs[$Tab->getKey()] = $Tab;
 	}
 
 	/**
-	 * Display navigation 
-	 */
-	protected function displayNavigation() {
-		$Links   = array();
-
-		foreach ($this->Tabs as $Tab)
-			$Links[] = array('tag' => Ajax::link($Tab->getTitle(), self::$TABS_ID, $Tab->getUrl()));
-
-		echo Ajax::toolbarNavigation($Links);
-	}
-
-	/**
-	 * Display tabs 
+	 * Display tabs
 	 */
 	public function display() {
 		if (Request::param('form') == 'true') {
@@ -93,10 +81,6 @@ class ConfigTabs {
 		}
 
 		if ($this->hasToShowDiv()) {
-			echo '<div class="panel-menu panel-menu-floated">';
-			$this->displayNavigation();
-			echo '</div>';
-
 			echo '<div id="'.self::$TABS_ID.'">';
 		}
 
@@ -116,13 +100,14 @@ class ConfigTabs {
 	}
 
 	/**
-	 * Display current tab 
+	 * Display current tab
 	 */
 	protected function displayCurrentTab() {
 		$CurrentKey = $this->getCurrentKey();
 
-		if (isset($this->Tabs[$CurrentKey]))
+		if (isset($this->Tabs[$CurrentKey])) {
 			$this->Tabs[$CurrentKey]->display();
+		}
 	}
 
 	/**
@@ -132,8 +117,9 @@ class ConfigTabs {
 	protected function getCurrentKey() {
 		$CurrentKey = Request::param('key');
 
-		if (empty($CurrentKey))
+		if (empty($CurrentKey)) {
 			$CurrentKey = $this->defaultKey;
+		}
 
 		return $CurrentKey;
 	}

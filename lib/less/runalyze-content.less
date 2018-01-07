@@ -39,9 +39,10 @@ a:link, a:visited {
 
 a:hover, a:active, .link:hover {
 	color: @link-hover;
-	transition: color 0.3s ease-out;
+	//transition: color 0.3s ease-out;
 }
 
+.glossary .panel-content a,
 p.text a, p.text a,
 a.external, a.external {
 	&:link, &:visited {
@@ -74,9 +75,14 @@ h1 {
 	a:hover, a:active { color: @link-hover; }
 }
 
-ul {
+ul, ol {
 	margin: @list-margin;
 	padding: @list-padding;
+}
+
+abbr {
+	text-decoration: none;
+	border-bottom: 1px dotted;
 }
 
 .show-on-hover-parent {
@@ -97,6 +103,10 @@ ul {
 			opacity: 0;
 		}
 	}
+}
+
+.flash-messages p:last-of-type {
+	margin-bottom: 1em;
 }
 
 p {
@@ -156,6 +166,7 @@ p.error, tr.ERROR td.errortype {
 
 p.file {
 	&:before { content: @p-message-file-icon; }
+	&.file-search:before { content: "\f002"; }
 	background-color: @p-message-file-background;
 	color: @p-message-file-color;
 }
@@ -198,7 +209,7 @@ tr.ERROR td {
 }
 
 .block { display: block; }
-.hide { display: none; }
+.hide { display: none !important; }
 .left { float: left; }
 .right { float: right; }
 .clear { clear: both; }
@@ -206,8 +217,10 @@ tr.ERROR td {
 .c { text-align: center; }
 .l { text-align: left; }
 .r { text-align: right; }
+.vc { vertical-align: middle; }
 .small { font-size: 0.8em; }
 .small.not-smaller .small { font-size: 1em; }
+.wk.highlight td { background: @table-background-highlight !important; font-weight: bold; }
 .wk td { background: @content-wk-color !important; font-weight: bold; }
 .link { padding-bottom: 1px; cursor: pointer; }
 .inline { display: inline; }
@@ -219,6 +232,12 @@ tr.ERROR td {
 .nomargin { margin: 0; }
 .margin-5 { margin: 0 5px; }
 .margin-10 { margin: 0 10px; }
+.margin-top { margin-top: 1em; }
+.margin-top-2x { margin-top: 2em; }
+.margin-top-4x { margin-top: 4em; }
+.margin-bottom { margin-bottom: 1em; }
+.margin-bottom-2x { margin-bottom: 2em; }
+.margin-bottom-4x { margin-bottom: 4em; }
 .transparent-70 { opacity: .7; }
 .w100, .fullwidth { width: 100%; }
 .w50 { width: 50%; }
@@ -226,7 +245,10 @@ tr.ERROR td {
 .w25 { width: 25%; }
 .marginr50 { margin-right: 50%; }
 .mono { font-family: monospace; }
+.nowrap { white-space: nowrap; }
+.cursor-not-allowed { cursor: not-allowed; }
 
+.disabled { opacity: .5; pointer-events: none; }
 .unimportant { opacity: .5; }
 .unimportant:hover { opacity: 1; }
 .nopadding tr, .nopadding td { padding: 0; }
@@ -248,3 +270,121 @@ tr.ERROR td {
 .multi-edit-icon i { opacity: 0.7; }
 .multi-edit-remove-link { position: absolute; top: 10px; left: -10px; }
 .multi-edit-table tr.edited { opacity: 0.5; }
+
+.data-browser-labels td {
+    position: relative;
+    height: 1em;
+    overflow: hidden;
+
+	span {
+		position: absolute;
+		display: block;
+		top: 0;
+		right: 0;
+		left: 0;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		overflow: hidden;
+	}
+}
+
+.notifications-list {
+	ul {
+		padding: 0;
+		border: 1px solid @heading-border;
+	}
+
+	li {
+		list-style-type: none;
+		border-top: 1px solid @heading-border;
+		padding: 1em 1em 1em 2em;
+		background: rgba(240,240,245,.4);
+		position: relative;
+
+		&:first-of-type {
+			border-top: 0;
+		}
+
+		&:nth-child(2n+1) {
+			background: rgba(250,250,255,.4);
+		}
+
+		&:hover {
+			background-color: rgba(230,230,255,.7);
+		}
+
+		&::before {
+			display: block;
+			content: '';
+			position: absolute;
+			left: .6em;
+			top: 50%;
+			width: .8em;
+			height: .8em;
+			margin-top: -.4em;
+			background-color: #ddd;
+			background-image: linear-gradient(#ddd, #ccc);
+			background-clip: padding-box;
+			border-radius: 50%;
+		}
+
+		&.is-new {
+			&::before {
+				background-color: #67b957;
+				background-image: linear-gradient(#67b957, #3f9235);
+			}
+		}
+
+		a, .no-link {
+			display: inline-block;
+			max-width: 70%;
+		}
+
+		time {
+			float: right;
+			display: inline-block;
+			max-width: 25%;
+			color: lighten(@font-color, 50%);
+			font-size: .8em;
+		}
+	}
+}
+
+.glossary {
+	li {
+		margin-bottom: .5em;
+	}
+}
+
+.see-also {
+	li {
+		display: inline;
+
+		&::after {
+			content: ", ";
+		}
+
+		&:last-of-type::after {
+			content: "";
+		}
+	}
+}
+
+.inline-span-menu-item:not(.hide) ~ .inline-span-menu-item::before {
+	content: " | ";
+}
+
+.loading-ellipsis:after {
+	overflow: hidden;
+	display: inline-block;
+	vertical-align: bottom;
+	animation: ellipsis steps(4,end) 1.5s infinite;
+	content: "\2026";
+	width: 0;
+}
+
+@keyframes ellipsis {
+	to {
+		width: 1.25em;
+	}
+}

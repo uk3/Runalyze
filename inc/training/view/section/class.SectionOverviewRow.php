@@ -3,9 +3,12 @@
  * This file contains class::SectionOverviewRow
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\View\Activity\Box;
+
 /**
  * Row: Overview
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -43,18 +46,18 @@ class SectionOverviewRow extends TrainingViewSectionRowFullwidth {
 	/**
 	 * Set boxed values
 	 */
-	protected function setBoxedValues() {	
+	protected function setBoxedValues() {
 		$this->BoxedValues = array(
-			new BoxedValue(Helper::Unknown($this->Training->getDistance(), '-.--'), 'km', __('Distance')),
-			new BoxedValue($this->Training->DataView()->getTimeString(), '', __('Time')),
-			new BoxedValue($this->Training->DataView()->getElapsedTimeString(), '', __('Elapsed time')),
-			new BoxedValue($this->Training->getPace(), '/km', __('Pace')),
-			new BoxedValue(Helper::Unknown($this->Training->getPulseAvg(), '-'), 'bpm', __('&oslash; Heartrate')),
-			new BoxedValue(Helper::Unknown($this->Training->getPulseMax(), '-'), 'bpm', __('max. Heartrate')),
-			new BoxedValue($this->Training->getCalories(), 'kcal', __('Calories')),
-			new BoxedValue(Helper::Unknown($this->Training->getCurrentlyUsedVdot(), '-'), '', __('VDOT'), $this->Training->DataView()->getVDOTicon()),
-			new BoxedValue($this->Training->getTrimp(), '', __('TRIMP')),
-			new BoxedValue(Helper::Unknown($this->Training->getElevation(), '-'), 'm', __('Elevation'))
+			new Box\Distance($this->Context),
+			new BoxedValue($this->Context->dataview()->duration()->string(), '', __('Time')),
+			new BoxedValue($this->Context->dataview()->elapsedTime(), '', __('Elapsed time')),
+			new Box\Pace($this->Context),
+			new BoxedValue(Helper::Unknown($this->Context->activity()->hrAvg(), '-'), 'bpm', __('avg.').' '.__('Heart rate')),
+			new BoxedValue(Helper::Unknown($this->Context->activity()->hrMax(), '-'), 'bpm', __('max.').' '.__('Heart rate')),
+			new Box\Energy($this->Context),
+			new BoxedValue(Helper::Unknown($this->Context->dataview()->vo2max()->value(), '-'), '', 'VO<sub>2</sub>max', $this->Context->dataview()->effectiveVO2maxIcon(), 'vo2max'),
+			new Box\Trimp($this->Context),
+			new Box\Elevation($this->Context)
 		);
 	}
 }

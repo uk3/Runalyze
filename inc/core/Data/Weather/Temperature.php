@@ -9,6 +9,7 @@ namespace Runalyze\Data\Weather;
 /**
  * Temperature
  * 
+ * @deprecated since 3.1.0
  * @author Hannes Christiansen
  * @package Runalyze\Data\Weather
  */
@@ -42,8 +43,8 @@ class Temperature {
 
 	/**
 	 * Temperature
-	 * @param float $value
-	 * @param int $unit
+	 * @param float|null $value
+	 * @param int|null $unit
 	 */
 	public function __construct($value = null, $unit = self::CELSIUS) {
 		$this->setTemperature($value, $unit);
@@ -51,8 +52,8 @@ class Temperature {
 
 	/**
 	 * Set temperature
-	 * @param float $value
-	 * @param int $unit
+	 * @param float|null $value
+	 * @param int|null $unit
 	 */
 	public function setTemperature($value, $unit = null) {
 		if (!is_null($unit)) {
@@ -64,12 +65,12 @@ class Temperature {
 
 	/**
 	 * To celsius
-	 * @param float $value
+	 * @param float|null $value
 	 * @param int $unit
 	 * @return float
 	 */
 	protected function toCelsiusFrom($value, $unit) {
-		if (is_null($value)) {
+		if (!is_numeric($value)) {
 			return null;
 		}
 
@@ -85,7 +86,7 @@ class Temperature {
 
 	/**
 	 * From celsius
-	 * @param float $value
+	 * @param float|null $value
 	 * @param int $unit
 	 * @return float
 	 */
@@ -126,6 +127,13 @@ class Temperature {
 	}
 
 	/**
+	 * @return null|float [°F]
+	 */
+	public function inFahrenheit() {
+		return $this->fromCelsiusTo($this->inCelsius, self::FAHRENHEIT);
+	}
+
+	/**
 	 * Temperature unknown?
 	 * @return bool
 	 */
@@ -134,8 +142,8 @@ class Temperature {
 	}
 
 	/**
-	 * Unit
-	 * @return string
+	 * Value
+	 * @return null|int
 	 */
 	public function value() {
 		return $this->fromCelsiusTo($this->inCelsius, $this->unit);
@@ -146,11 +154,20 @@ class Temperature {
 	 * @return string
 	 */
 	public function asString() {
+		return $this->asStringWithoutUnit().'&nbsp;'.$this->unit();
+	}
+
+	/**
+	 * As string without unit
+	 * @param string $stringForUnknown [optional]
+	 * @return string
+	 */
+	public function asStringWithoutUnit($stringForUnknown = '?') {
 		if ($this->isUnknown()) {
-			return '?&nbsp;'.$this->unit();
+			return $stringForUnknown;
 		}
 
-		return round($this->value()).'&nbsp;'.$this->unit();
+		return round($this->value());
 	}
 
 	/**

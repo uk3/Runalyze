@@ -28,6 +28,12 @@ abstract class ConfigTab {
 	protected $key = '';
 
 	/**
+	 * Model factory
+	 * @var \Runalyze\Model\Factory
+	 */
+	protected $Model;
+
+	/**
 	 * Set key and title for form 
 	 */
 	abstract protected function setKeyAndTitle();
@@ -46,6 +52,8 @@ abstract class ConfigTab {
 	 * Construct new tab
 	 */
 	public function __construct() {
+		$this->Model = new Runalyze\Model\Factory(SessionAccountHandler::getId());
+
 		$this->setKeyAndTitle();
 	}
 
@@ -89,7 +97,7 @@ abstract class ConfigTab {
 		$this->Formular->addCSSclass('ajax');
 		$this->Formular->addCSSclass('no-automatic-reload');
 		$this->Formular->addHiddenValue('configTabKey', $this->key);
-		$this->Formular->addSubmitButton('Speichern');
+		$this->Formular->addSubmitButton(__('Save'));
 		$this->Formular->display();
 	}
 
@@ -98,6 +106,6 @@ abstract class ConfigTab {
 	 * @return string
 	 */
 	final public function getUrl() {
-		return 'call/window.config.php?key='.$this->key;
+		return 'settings?key='.$this->key;
 	}
 }

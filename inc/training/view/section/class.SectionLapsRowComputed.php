@@ -3,9 +3,13 @@
  * This file contains class::SectionLapsRowComputed
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\View\Activity\Linker;
+use Runalyze\View\Activity;
+
 /**
  * Row: Laps (computed)
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -14,7 +18,7 @@ class SectionLapsRowComputed extends TrainingViewSectionRow {
 	 * Set plot
 	 */
 	protected function setPlot() {
-		$this->Plot = new TrainingPlotLapsComputed($this->Training);
+		$this->Plot = new Activity\Plot\LapsComputed($this->Context);
 	}
 
 	/**
@@ -22,30 +26,27 @@ class SectionLapsRowComputed extends TrainingViewSectionRow {
 	 */
 	protected function setContent() {
 		$this->withShadow = true;
-
-		$this->addTable();
-
 		$this->addInfoLink();
+		$this->addTable();
 	}
 
 	/**
 	 * Add: table
 	 */
 	protected function addTable() {
-		if ($this->Training->hasArrayPace()) {
-			$Table = new TableLapsComputed($this->Training);
-			$this->Code = $Table->getCode();
-		}
+		$Table = new TableLapsComputed($this->Context);
+		$this->Code = $Table->getCode();
 	}
 
 	/**
 	 * Add info link
 	 */
 	protected function addInfoLink() {
-		if ($this->Training->hasArrayPace()) {
-			$InfoLink = Ajax::window('<a href="'.$this->Training->Linker()->urlToRoundsInfo().'">'.__('More details about your laps').'</a>', 'normal');
+		if (!Request::isOnSharedPage()) {
+			$Linker = new Linker($this->Context->activity());
+			$InfoLink = Ajax::window('<a href="'.$Linker->urlToRoundsInfo().'">'.__('More details about your laps').'</a>', 'big');
 
-			$this->Content = HTML::info( $InfoLink );
+			$this->Header = HTML::info( $InfoLink );
 		}
 	}
 }

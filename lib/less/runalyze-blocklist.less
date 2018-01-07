@@ -25,13 +25,23 @@
 		background-position: 9px center;
 		background-repeat: no-repeat;
 
-		&:hover {
+		&:hover,
+		&.triggered {
 			background-color: @blocklist-bg-color-hover;
+		}
+
+		&.triggered {
+			color: #000;
 		}
 
 		&.nopadding {
 			width: 120px;
 			padding: 5px;
+		}
+
+		&.w100 {
+			width: 100%;
+			box-sizing: border-box;
 		}
 
 		.fa {
@@ -44,6 +54,12 @@
 			font-size: (@blocklist-height + 2*@blocklist-padding-top-bottom)/2;
 			text-align: center;
 		}
+	}
+
+	&.blocklist-width-auto a {
+		display: inline-block;
+		width: auto;
+		padding-right: (2*@blocklist-padding-top-bottom);
 	}
 }
 

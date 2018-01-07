@@ -36,7 +36,7 @@ class Handle {
 
 	/**
 	 * Onchange reload flag
-	 * @var enum
+	 * @var mixed enum
 	 */
 	protected $OnchangeReloadFlag = '';
 
@@ -44,13 +44,13 @@ class Handle {
 	 * Array with all values
 	 * @var array
 	 */
-	static private $TableHandles = array();
+	private static $TableHandles = array();
 
 	/**
 	 * All table handles
 	 * @return array array('key' => 'table')
 	 */
-	static public function tableHandles() {
+	public static function tableHandles() {
 		return self::$TableHandles;
 	}
 
@@ -102,7 +102,7 @@ class Handle {
 
 	/**
 	 * Register onchange flag
-	 * @param enum $flag
+	 * @param string $flag
 	 */
 	final public function registerOnchangeFlag($flag) {
 		$this->OnchangeReloadFlag = $flag;

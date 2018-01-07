@@ -5,36 +5,50 @@
  * @package Runalyze\Plugins\Stats
  */
 
+use Runalyze\Util\LocalTime;
+
 $titleCenter = __('Activity [in h] by day time');
 $xAxis       = array(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23);
 $yAxis       = array();
 
 if ($this->sportid > 0) {
-	$Sports = DB::getInstance()->query('SELECT `id`, `name` FROM `'.PREFIX.'sport` WHERE `id`='.(int)$this->sportid)->fetchAll();
+	$Sports = array(SportFactory::DataFor((int)$this->sportid));
 } else {
-	$Sports = DB::getInstance()->query('SELECT `id`, `name` FROM `'.PREFIX.'sport` ORDER BY `id` ASC')->fetchAll();
+	$Sports = SportFactory::AllSports();
 }
+
+$Query = DB::getInstance()->prepare(
+	'SELECT time, s
+	FROM `' . PREFIX . 'training`
+	WHERE
+		`accountid`='.SessionAccountHandler::getId().' AND
+		`sportid`=:id AND
+		(HOUR(FROM_UNIXTIME(`time`))!=0 OR MINUTE(FROM_UNIXTIME(`time`))!=0)
+		' . $this->getYearDependenceForQuery() . '
+	'
+);
 
 foreach ($Sports as $sport) {
 	$id = $sport['name'];
-	$yAxis[$id] = array(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+	$yAxis[$id] = array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-	$data = DB::getInstance()->query('
-		SELECT
-			SUM(1) as `num`,
-			SUM(`s`) as `value`,
-			HOUR(FROM_UNIXTIME(`time`)) as `h`
-		FROM `'.PREFIX.'training`
-		WHERE
-			`sportid`="'.$sport['id'].'" AND
-			(HOUR(FROM_UNIXTIME(`time`))!=0 OR MINUTE(FROM_UNIXTIME(`time`))!=0)
-			'.($this->year > 0 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.(int)$this->year : '').'
-		GROUP BY `h`
-		ORDER BY `h` ASC
-	')->fetchAll();
+	$Query->execute(array(':id' => $sport['id']));
+	$data = $Query->fetchAll();
 
-	foreach ($data as $dat)
-		$yAxis[$id][$dat['h']] = $dat['value']/3600;
+	foreach ($data as $dat) {
+		$time = (new LocalTime($dat['time']))->toServerTimestamp();
+		$starttime = getdate($time);
+		$endtime = getdate($time + $dat['s']);
+
+		$yAxis[$id][$starttime['hours']] += (60 - $starttime['minutes']) / 60;
+		$yAxis[$id][$endtime['hours']] += $endtime['minutes'] / 60;
+
+		if ($starttime['hours'] == $endtime['hours'])
+			$yAxis[$id][$starttime['hours']] -= 1;
+
+		for ($i = $starttime['hours'] + 1; $i < $endtime['hours']; $i++)
+			$yAxis[$id][$i] += 1;
+	}
 }
 
 $Plot = new Plot("daytime", 350, 190);
@@ -56,12 +70,12 @@ $Plot->showBars(true);
 $Plot->stacked();
 
 $error = true;
-foreach ($yAxis as $t) 
-	foreach ($t as $e) 
-		if ($e != "0") 
+foreach ($yAxis as $t)
+	foreach ($t as $e)
+		if ($e != "0")
 			$error = false;
 
-if ($error === true) 
+if ($error === true)
 	$Plot->raiseError( __('No data available.') );
 
 

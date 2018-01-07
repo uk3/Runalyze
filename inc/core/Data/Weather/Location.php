@@ -5,7 +5,8 @@
  */
 
 namespace Runalyze\Data\Weather;
-
+use League\Geotools\Geohash\Geohash;
+use League\Geotools\Coordinate\Coordinate;
 /**
  * Weather location
  *
@@ -15,21 +16,21 @@ namespace Runalyze\Data\Weather;
 class Location {
 	/**
 	 * Latitude
-	 * @var float
+	 * @var float|null
 	 */
 	protected $Latitude = null;
 
 	/**
 	 * Longitude
-	 * @var float
+	 * @var float|null
 	 */
 	protected $Longitude = null;
 
 	/**
-	 * Timestamp
-	 * @var int
+	 * DateTime
+	 * @var \DateTime|null
 	 */
-	protected $Timestamp = null;
+	protected $DateTime = null;
 
 	/**
 	 * Location name
@@ -46,13 +47,22 @@ class Location {
 		$this->Latitude = $latitude;
 		$this->Longitude = $longitude;
 	}
+	
+	/**
+	 * Set geohash
+	 * @param string $geohash
+	 */
+	public function setGeohash($geohash) {
+		$decoded = (new Geohash)->decode($geohash)->getCoordinate();
+		$this->Latitude = $decoded->getLatitude();
+		$this->Longitude = $decoded->getLongitude();
+	}
 
 	/**
-	 * Set timestamp
-	 * @param int $timestamp
+	 * @param \DateTime|null $dateTime
 	 */
-	public function setTimestamp($timestamp) {
-		$this->Timestamp = $timestamp;
+	public function setDateTime($dateTime) {
+		$this->DateTime = $dateTime;
 	}
 
 	/**
@@ -78,13 +88,30 @@ class Location {
 	public function lon() {
 		return $this->Longitude;
 	}
+	
+	/**
+	 * Geohash
+	 * @return string
+	 */
+	public function geohash() {
+	    if ($this->hasPosition()) {
+			return (new Geohash)->encode(new Coordinate(array((float)$this->lat(), (float)$this->lon())), 12)->getGeohash();
+	    }
+	}
 
 	/**
 	 * Time
+	 * @return \DateTime|null
+	 */
+	public function dateTime() {
+		return $this->DateTime;
+	}
+
+	/**
 	 * @return int
 	 */
-	public function time() {
-		return $this->Timestamp;
+	public function timestamp() {
+		return $this->DateTime->getTimestamp();
 	}
 
 	/**
@@ -119,15 +146,16 @@ class Location {
 	 * Is position set?
 	 * @return bool
 	 */
-	public function hasTimestamp() {
-		return !is_null($this->Timestamp) && $this->Timestamp != 0;
+	public function hasDateTime() {
+		return null !== $this->DateTime;
 	}
 
 	/**
 	 * Is the location old?
+	 * @param int $seconds
 	 * @return bool true if the timestamp is older than 24 hours
 	 */
-	public function isOld() {
-		return $this->hasTimestamp() && ($this->Timestamp < time() - DAY_IN_S);
+	public function isOlderThan($seconds = DAY_IN_S) {
+		return $this->hasDateTime() && ($this->timestamp() < time() - $seconds);
 	}
 }

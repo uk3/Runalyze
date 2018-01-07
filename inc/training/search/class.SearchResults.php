@@ -4,7 +4,16 @@
  * @package Runalyze\Search
  */
 
+use Runalyze\Activity\Distance;
+use Runalyze\Activity\Duration;
+use Runalyze\Activity\Elevation;
+use Runalyze\Activity\Energy;
+use Runalyze\Activity\Pace;
+use Runalyze\Activity\StrideLength;
 use Runalyze\Configuration;
+use Runalyze\Util\LocalTime;
+use Runalyze\Activity\Temperature;
+use Runalyze\Data\Weather\WindSpeed;
 
 /**
  * Search results
@@ -14,155 +23,339 @@ use Runalyze\Configuration;
  */
 class SearchResults {
 	/**
-	 * Allowed keys
-	 * @var array
+	 * @var int
 	 */
-	private $allowedKeys = array();
+	const MAX_LIMIT_FOR_MULTI_EDITOR = 100;
 
 	/**
-	 * Dataset
-	 * @var Dataset
+	 * Allowed keys to search for
+	 * @var array
 	 */
-	private $Dataset = null;
+	protected $AllowedKeys = array();
+
+	/** @var array */
+	protected $KeysThatShouldIgnoreNull = array();
+
+	/** @var array */
+	protected $KeysThatShouldIgnoreZero = array();
 
 	/**
 	 * Colspan
 	 * @var int
 	 */
-	private $colspan = 0;
+	protected $Colspan = 0;
 
 	/**
 	 * Trainings
 	 * @var array
 	 */
-	private $Trainings = array();
+	protected $Trainings = array();
 
 	/**
 	 * Total number of trainings
 	 * @var int
 	 */
-	private $totalNumberOfTrainings = 0;
+	protected $TotalNumberOfTrainings = 0;
 
 	/**
 	 * Page
 	 * @var int
 	 */
-	private $page = 0;
+	protected $Page = 0;
 
 	/**
 	 * Search and show trainings=
 	 * @var boolean
 	 */
-	private $withResults = true;
+	protected $WithResults = true;
 
 	/**
 	 * Results per page
 	 * @var int
 	 */
-	private $resultsPerPage;
+	protected $ResultsPerPage;
+
+	/** @var int */
+	protected $AccountID;
+
+	/** @var \PDOforRunalyze */
+	protected $DB;
+
+	/** @var \Runalyze\Dataset\Configuration */
+	protected $DatasetConfig;
+
+	/** @var \Runalyze\Dataset\Query */
+	protected $DatasetQuery;
 
 	/**
 	 * Constructor
 	 * @param boolean $withResults
 	 */
 	public function __construct($withResults = true) {
-		$this->withResults = $withResults;
-		$this->resultsPerPage = Configuration::Misc()->searchResultsPerPage();
+		$this->WithResults = $withResults;
 
 		$this->setAllowedKeys();
-		$this->initDataset();
+		$this->setKeysThatShouldIgnoreNull();
+		$this->setKeysThatShouldIgnoreZero();
 
-		if ($withResults)
+        $this->ResultsPerPage = (isset($_POST['resultsPerPage']) && is_numeric($_POST['resultsPerPage'])) ? $_POST['resultsPerPage'] : 20;
+
+        if ($withResults) {
+			$this->initDataset();
 			$this->searchTrainings();
+		}
 	}
 
 	/**
 	 * Set allowed keys
+	 *
+	 * These keys are valid for 'sort by' and for any condition.
+	 * `sportid` and `time` are valid anyway, they don't need to be set here.
 	 */
-	private function setAllowedKeys() {
-		$this->allowedKeys = array(
-			'distance',
-			'route',
-			'elevation',
-			's',
-			'comment',
-			'temperature',
-			'pulse_avg',
-			'partner',
-			'kcal',
+	protected function setAllowedKeys() {
+		// Keys are sorted as in structure.sql
+		$this->AllowedKeys = array(
 			'typeid',
+			'is_public',
+			'is_track',
+			'distance',
+			's',
+			'elapsed_time',
+			'elevation',
+            'climb_score',
+            'percentage_hilly',
+			'kcal',
+			'pulse_avg',
+			'pulse_max',
+			'vo2max',
+			'vo2max_with_elevation',
+			'use_vo2max',
+			'fit_vo2max_estimate',
+			'fit_recovery_time',
+			'fit_hrv_analysis',
+			'fit_training_effect',
+			'fit_performance_condition',
+			'rpe',
+			'trimp',
+			'cadence',
+			'power',
+			'total_strokes',
+			'swolf',
+			'stride_length',
+			'groundcontact',
+			'groundcontact_balance',
+			'vertical_oscillation',
+			'vertical_ratio',
+			'temperature',
+			'wind_speed',
+			'wind_deg',
+			'humidity',
+			'pressure',
+			'is_night',
 			'weatherid',
-			'shoeid'
+			'route',
+			'title',
+			'partner',
+			'notes'
 		);
+	}
 
-		// Some additional keys
-		$this->allowedKeys[] = 'is_public';
-		$this->allowedKeys[] = 'is_track';
-		$this->allowedKeys[] = 'trimp';
-		$this->allowedKeys[] = 'vdot';
-		$this->allowedKeys[] = 'pulse_max';
-		$this->allowedKeys[] = 'jd_points';
-		$this->allowedKeys[] = 'notes';
+	/**
+	 * The following keys will add a `IS NOT NULL` if they have a condition (or order by)
+	 */
+	protected function setKeysThatShouldIgnoreNull() {
+		$this->KeysThatShouldIgnoreNull = [
+		    'climb_score',
+			'percentage_hilly',
+			'fit_training_effect',
+			'fit_performance_condition',
+			'rpe',
+			'temperature',
+			'wind_speed',
+			'wind_deg',
+			'humidity',
+			'pressure'
+		];
+	}
+
+	/**
+	 * The following keys will add a `!= 0` if they have a condition (or order by)
+	 */
+	protected function setKeysThatShouldIgnoreZero() {
+		$this->KeysThatShouldIgnoreZero = [
+			'distance',
+			'pulse_avg',
+			'pulse_max',
+			'vo2max',
+			'fit_vo2max_estimate',
+			'fit_recovery_time',
+			'fit_hrv_analysis',
+			'cadence',
+			'power',
+			'total_strokes',
+			'swolf',
+			'stride_length',
+			'groundcontact',
+			'groundcontact_balance',
+			'vertical_oscillation',
+			'vertical_ratio'
+		];
 	}
 
 	/**
 	 * Init dataset
 	 */
-	private function initDataset() {
-		$this->Dataset = new Dataset();
-		$this->Dataset->loadCompleteDataset();
+	protected function initDataset() {
+		$this->AccountID = SessionAccountHandler::getId();
+		$this->DB = DB::getInstance();
+		$this->DatasetConfig = new \Runalyze\Dataset\Configuration($this->DB, $this->AccountID);
+		$this->DatasetQuery = new \Runalyze\Dataset\Query($this->DatasetConfig, $this->DB, $this->AccountID);
 
-		$this->colspan = $this->Dataset->cols() + 2;
+		$this->DatasetConfig->activateAllKeys();
+		$this->Colspan = 2 + count($this->DatasetConfig->allKeys());
 	}
 
 	/**
 	 * Search trainings
 	 */
-	private function searchTrainings() {
-		$this->totalNumberOfTrainings = DB::getInstance()->query('SELECT COUNT(*) FROM `'.PREFIX.'training` '.$this->getWhere().$this->getOrder().' LIMIT 1')->fetchColumn();
-		$this->page = (int)Request::param('page');
+	protected function searchTrainings() {
+		$where = $this->getWhere();
 
-		if (($this->page-1)*$this->resultsPerPage > $this->totalNumberOfTrainings)
-			$this->page--;
+		$this->TotalNumberOfTrainings = DB::getInstance()->query('SELECT COUNT(*) FROM `'.PREFIX.'training` AS `t` '.$this->joinRaceResultIfRequired().' '.$where.' LIMIT 1')->fetchColumn();
+		$this->Page = (int)Request::param('page');
+
+		if (($this->Page-1)*$this->ResultsPerPage > $this->TotalNumberOfTrainings)
+			$this->Page--;
+
+		$this->DatasetQuery->resetJoins();
 
 		$this->Trainings = DB::getInstance()->query(
-			'SELECT
-				id,
-				time
-				'.$this->Dataset->getQuerySelectForAllDatasets().'
-			FROM `'.PREFIX.'training`
-			'.$this->getWhere().$this->getOrder().$this->getLimit()
+			'SELECT DISTINCT
+				`t`.`id`,
+				`t`.`time`
+				'.($this->multiEditorRequested() ? '' :
+					', '.$this->DatasetQuery->queryToSelectAllKeys().' '.
+					$this->DatasetQuery->queryToSelectJoinedFields()
+				).'
+				'.$this->columnFromRaceResultIfRequired().'
+			FROM `'.PREFIX.'training` AS `t`
+			'.$this->joinRaceResultIfRequired().'
+			'.$this->DatasetQuery->queryToJoinTables().'
+			'.$where.' '.
+			$this->DatasetQuery->queryToGroupByActivity().
+			$this->getOrder().$this->getLimit()
 		)->fetchAll();
+	}
+
+	/**
+	 * @return string
+	 */
+	protected function columnFromRaceResultIfRequired() {
+		if (isset($_POST['is_race']) && $_POST['is_race'] != '') {
+			return ', `rr`.`activity_id`';
+		}
+
+		return '';
+	}
+
+	/**
+	 * @return string
+	 */
+	protected function joinRaceResultIfRequired() {
+		if (isset($_POST['is_race']) && $_POST['is_race'] != '') {
+			return 'LEFT JOIN `'.PREFIX.'raceresult` AS `rr` ON `t`.`id` = `rr`.`activity_id`';
+		}
+
+		return '';
 	}
 
 	/**
 	 * Get where
 	 * @return string
 	 */
-	private function getWhere() {
-		$conditions = array();
+	protected function getWhere() {
+		$conditions = array('`t`.`accountid`="'.$this->AccountID.'"');
 
-		if (isset($_POST['date-from']) && isset($_POST['date-to']))
-			$this->addTimeRangeCondition($conditions);
+		$this->addSpecialConditions($conditions);
 
-		if (isset($_POST['sportid']))
-			$this->addSportCondition($conditions);
-
-		if (isset($_POST['clothes']))
-			$this->addClothesCondition($conditions);
-
-		foreach ($this->allowedKeys as $key) {
-			if (isset($_POST[$key]))
-				if (is_array($_POST[$key]))
-					$this->addConditionForArray($key, $conditions);
-				elseif (strlen($_POST[$key]) > 0)
-					$this->addConditionFor($key, $conditions);
+		if (isset($_POST['s']) && strlen($_POST['s']) > 0) {
+			$Time = new Duration($_POST['s']);
+			$_POST['s'] = $Time->seconds();
 		}
 
-		if (empty($conditions))
-			return 'WHERE 1';
+		foreach ($this->AllowedKeys as $key) {
+			if (isset($_POST[$key])) {
+				if (is_array($_POST[$key])) {
+					$this->addConditionForArray($key, $conditions);
+				} elseif (strlen($_POST[$key]) > 0) {
+					$this->addConditionFor($key, $conditions);
+				}
+			}
+		}
 
-		return 'WHERE '.implode(' AND ', $conditions);
+		$this->addConditionsForOrder($conditions);
+
+		return $this->getEquipmentCondition().$this->getTagCondition().' WHERE '.implode(' AND ', array_unique($conditions));
+	}
+
+	/**
+	 * @param array $conditions
+	 */
+	protected function addSpecialConditions(array &$conditions) {
+		if (isset($_POST['sportid'])) {
+			$this->addSportCondition($conditions);
+		}
+
+		if (isset($_POST['date-from']) && isset($_POST['date-to'])) {
+			$this->addTimeRangeCondition($conditions);
+		}
+
+		if (isset($_POST['pace']) && $_POST['pace'] != '') {
+			$this->addPaceCondition($conditions);
+		}
+
+		if (isset($_POST['gradient']) && $_POST['gradient'] != '') {
+			$this->addGradientCondition($conditions);
+		}
+
+		if (isset($_POST['is_race']) && $_POST['is_race'] != '') {
+			$this->addIsRaceCondition($conditions);
+		}
+	}
+
+	/**
+	 * @param array $conditions
+	 */
+	protected function addPaceCondition(array &$conditions) {
+		$Pace = new Pace(0);
+		$Pace->fromMinPerKm($_POST['pace']);
+		$value = $Pace->secondsPerKm();
+		$sign = $this->signForKey('pace');
+
+		$conditions[] = '`t`.`distance` > 0';
+		$conditions[] = ($sign == '=' ? 'ROUND(`t`.`s`/`t`.`distance`)' : '`t`.`s`/`t`.`distance`').' '.$sign.' '.DB::getInstance()->escape($value);
+	}
+
+	/**
+	 * @param array $conditions
+	 */
+	protected function addGradientCondition(array &$conditions) {
+		$value = 10*(float)str_replace(',', '.', $_POST['gradient']);
+
+		$conditions[] = '`t`.`distance` > 0';
+		$conditions[] = '`t`.`elevation` > 0';
+		$conditions[] = '`t`.`elevation`/`t`.`distance` '.$this->signForKey('gradient').' '.DB::getInstance()->escape($value);
+	}
+
+	/**
+	 * @param array $conditions
+	 */
+	protected function addIsRaceCondition(array &$conditions) {
+		if ($_POST['is_race'] == 1) {
+			$conditions[] = '`rr`.`activity_id` IS NOT NULL';
+		} else {
+			$conditions[] = '`rr`.`activity_id` IS NULL';
+		}
 	}
 
 	/**
@@ -170,13 +363,15 @@ class SearchResults {
 	 * @param string $key
 	 * @param array $conditions
 	 */
-	private function addConditionForArray($key, array &$conditions) {
+	protected function addConditionForArray($key, array &$conditions) {
 		$array = array_map(
-			create_function('$value', 'return (int)$value;'),
+			function ($value) {
+				return (int)$value;
+			},
 			$_POST[$key]
 		);
 
-		$conditions[] = '`'.$key.'` IN('.implode(',', $array).')';
+		$conditions[] = '`t`.`'.$key.'` IN('.implode(',', $array).')';
 	}
 
 	/**
@@ -184,13 +379,73 @@ class SearchResults {
 	 * @param string $key
 	 * @param array $conditions
 	 */
-	private function addConditionFor($key, array &$conditions) {
+	protected function addConditionFor($key, array &$conditions) {
 		$sign = (isset($_POST['opt'][$key])) ? $this->signFor($_POST['opt'][$key]) : '=';
 
-		if ($sign == ' LIKE ')
-			$conditions[] = '`'.$key.'` '.$sign.' "%'.DB::getInstance()->escape($_POST[$key], false).'%"';
-		else
-			$conditions[] = '`'.$key.'` '.$sign.' '.DB::getInstance()->escape($_POST[$key]);
+		if ($sign == ' LIKE ') {
+			$conditions[] = '`t`.`'.$key.'` '.$sign.' "%'.DB::getInstance()->escape($_POST[$key], false).'%"';
+		} else {
+			$value = $this->transformValueForDatabase($key, $_POST[$key]);
+
+			$conditions[] = '`t`.`'.$key.'` '.$sign.' '.DB::getInstance()->escape($value);
+
+			if ($sign == '<' || $sign == '<=') {
+				if (in_array($key, $this->KeysThatShouldIgnoreZero)) {
+					$conditions[] = '`t`.`'.$key.'` != 0';
+				} elseif (in_array($key, $this->KeysThatShouldIgnoreNull)) {
+					$conditions[] = '`t`.`'.$key.'` IS NOT NULL';
+				}
+			}
+		}
+	}
+
+	/**
+	 * @param string $key
+	 * @param string $value
+	 * @return float|int
+	 */
+	protected function transformValueForDatabase($key, $value) {
+		if (in_array($key, array('distance', 'vertical_oscillation', 'vertical_ratio', 'stride_length', 'groundcontact_balance', 'fit_training_effect', 'kcal'))) {
+			$value = (float)str_replace(',', '.', $value);
+		}
+
+		if ($key == 'elevation') {
+			$value = (new Elevation())->setInPreferredUnit($value)->meter();
+		} elseif ($key == 'distance') {
+			$value = (new Distance())->setInPreferredUnit($value)->kilometer();
+        } elseif ($key == 'percentage_hilly') {
+            $value *= 0.01;
+		} elseif ($key == 'vertical_oscillation' || $key == 'vertical_ratio') {
+			$value *= 10;
+		} elseif ($key == 'groundcontact_balance') {
+			$value *= 100;
+		} elseif ($key == 'stride_length') {
+			$value = (new StrideLength())->setInPreferredUnit($value)->cm();
+		} elseif ($key == 'temperature') {
+			$value = (new Temperature())->setInPreferredUnit($value)->celsius();
+		} elseif ($key == 'wind_speed') {
+			$value = (new WindSpeed())->setInPreferredUnit($value)->value();
+		} elseif (($key == 'vo2max' || $key == 'vo2max_with_elevation')) {
+			$value /= Configuration::Data()->vo2maxCorrectionFactor();
+		} elseif ($key == 'kcal') {
+			$value = (new Energy())->setInPreferredUnit($value)->kcal();
+		} elseif ($key == 'fit_recovery_time') {
+            $value *= 60;
+        }
+
+		return $value;
+	}
+
+	/**
+	 * @param string $key
+	 * @return string
+	 */
+	protected function signForKey($key) {
+		if (isset($_POST['opt'][$key])) {
+			return $this->signFor($_POST['opt'][$key]);
+		}
+
+		return '=';
 	}
 
 	/**
@@ -198,8 +453,8 @@ class SearchResults {
 	 * @param string $postSign from $_POST
 	 * @return string
 	 */
-	private function signFor($postSign) {
-		switch($postSign) {
+	protected function signFor($postSign) {
+		switch ($postSign) {
 			case 'is': return '=';
 			case 'gt': return '>';
 			case 'ge': return '>=';
@@ -216,119 +471,200 @@ class SearchResults {
 	 * Add time range condition
 	 * @param array $conditions
 	 */
-	private function addTimeRangeCondition(array &$conditions) {
-		if (FormularValueParser::validatePost('date-from', FormularValueParser::$PARSER_DATE)
-				&& FormularValueParser::validatePost('date-to', FormularValueParser::$PARSER_DATE)
-				&& $_POST['date-to'] > 0)
-			$conditions[] = '`time` BETWEEN '.(int)$_POST['date-from'].' AND '.((int)$_POST['date-to']+DAY_IN_S);
+	protected function addTimeRangeCondition(array &$conditions) {
+		if (
+			FormularValueParser::validatePost('date-from', FormularValueParser::$PARSER_DATE) &&
+			FormularValueParser::validatePost('date-to', FormularValueParser::$PARSER_DATE) &&
+			$_POST['date-to'] > 0
+		) {
+			$conditions[] = '`t`.`time` BETWEEN '.LocalTime::fromServerTime($_POST['date-from'])->getTimestamp().' AND '.(LocalTime::fromServerTime($_POST['date-to'])->getTimestamp()+DAY_IN_S);
+		}
 	}
 
 	/**
 	 * Add sport condition
 	 * @param array $conditions
 	 */
-	private function addSportCondition(array &$conditions) {
+	protected function addSportCondition(array &$conditions) {
 		if (is_array($_POST['sportid'])) {
 			$array = array_map(
-				create_function('$value', 'return (int)$value;'),
+				function ($value) {
+					return (int)$value;
+				},
 				$_POST['sportid']
 			);
 
-			$conditions[] = '`sportid` IN('.implode(',', $array).')';
+			$conditions[] = '`t`.`sportid` IN('.implode(',', $array).')';
 		} else {
-			$conditions[] = '`sportid`="'.(int)$_POST['sportid'].'"';
+			$conditions[] = '`t`.`sportid`="'.(int)$_POST['sportid'].'"';
 		}
 	}
 
 	/**
-	 * Add clothes condition
-	 * @param array $conditions
+	 * Get equipment condition
+	 * @return string
 	 */
-	private function addClothesCondition(array &$conditions) {
-		if (!is_array($_POST['clothes']))
-			$_POST['clothes'] = array((int)$_POST['clothes']);
+	protected function getEquipmentCondition() {
+		if (!isset($_POST['equipmentid'])) {
+			return '';
+		}
 
-		foreach ($_POST['clothes'] as $id)
-			$conditions[] = 'FIND_IN_SET('.(int)$id.',`clothes`)';
+		if (is_array($_POST['equipmentid'])) {
+			$array = array_map(
+				function ($value) {
+					return (int)$value;
+				},
+				$_POST['equipmentid']
+			);
+
+			return 'INNER JOIN (SELECT `ae`.`activityid` FROM `'.PREFIX.'activity_equipment` AS `ae` WHERE `ae`.`equipmentid` IN('.implode(',', $array).')) AS `suba` ON `suba`.`activityid` = `t`.`id`';
+		}
+
+		return 'INNER JOIN `'.PREFIX.'activity_equipment` AS `ae` ON `ae`.`activityid` = `t`.`id` AND `ae`.`equipmentid`="'.(int)$_POST['equipmentid'].'"';
+	}
+
+	/**
+	 * Get tag condition
+	 * @return string
+	 */
+	private function getTagCondition() {
+		if (!isset($_POST['tagid'])) {
+			return '';
+		}
+
+		if (is_array($_POST['tagid'])) {
+			$array = array_map(
+				function ($value) {
+					return (int)$value;
+				},
+				$_POST['tagid']
+			);
+
+			return 'INNER JOIN (SELECT `at`.`activityid` FROM `'.PREFIX.'activity_tag` AS `at` WHERE `at`.`tagid` IN('.implode(',', $array).')) AS `subb` ON `subb`.`activityid` = `t`.`id`';
+		}
+
+		return 'INNER JOIN `'.PREFIX.'activity_tag` AS `at` ON `at`.`activityid` = `t`.`id` AND `at`.`tagid`="'.(int)$_POST['tagid'].'"';
 	}
 
 	/**
 	 * Get order
 	 * @return string
 	 */
-	private function getOrder() {
-		$sort  = (!isset($_POST['search-sort-by']) || array_key_exists($_POST['search-sort-by'], $this->allowedKeys)) ? '`time`' : DB::getInstance()->escape($_POST['search-sort-by'], false);
-		$order = (!isset($_POST['search-sort-order'])) ? 'DESC' : DB::getInstance()->escape($_POST['search-sort-order'], false);
+	protected function getOrder() {
+		$order = (!isset($_POST['search-sort-order'])) ? 'DESC' : $this->DB->escape($_POST['search-sort-order'], false);
 
-		if ($sort == 'vdot' && Configuration::Vdot()->useElevationCorrection())
-			return ' ORDER BY IF(`vdot_with_elevation`>0,`vdot_with_elevation`,`vdot`) '.$order;
+		if (isset($_POST['search-sort-by'])) {
+			if ($_POST['search-sort-by'] == 'vo2max' && Configuration::VO2max()->useElevationCorrection()) {
+				return ' ORDER BY IF(`t`.`vo2max_with_elevation`>0, `t`.`vo2max_with_elevation`, `t`.`vo2max`) '.$order;
+			}
 
-		return ' ORDER BY '.$sort.' '.$order;
+			if ($_POST['search-sort-by'] == 'pace') { // addConditionsForOrder() guarantees that `distance` > 0
+				return ' ORDER BY `t`.`s`/`t`.`distance` '.$order;
+			}
+
+			if ($_POST['search-sort-by'] == 'gradient') { // addConditionsForOrder() guarantees that `distance` > 0
+				return ' ORDER BY `t`.`elevation`/`t`.`distance` '.$order;
+			}
+
+            if ($_POST['search-sort-by'] == 'flight_time') {
+                return ' ORDER BY (30000/`t`.`cadence` - `t`.`groundcontact`) '.$order;
+            }
+
+            if ($_POST['search-sort-by'] == 'flight_ratio') {
+                return ' ORDER BY (1 - `t`.`cadence` * `t`.`groundcontact` / 30000) '.$order;
+            }
+
+			if (in_array($_POST['search-sort-by'], $this->AllowedKeys)) {
+				return ' ORDER BY `t`.'.$this->DB->escape($_POST['search-sort-by'], false).' '.$order;
+			}
+		}
+
+		return ' ORDER BY `t`.`time` '.$order;
+	}
+
+	/**
+	 * Add additional conditions for order
+	 * @param array $conditions
+	 */
+	protected function addConditionsForOrder(array &$conditions) {
+		if (!isset($_POST['search-sort-by']))
+			return;
+
+		if ($_POST['search-sort-by'] == 'pace') {
+			$conditions[] = '`t`.`distance` > 0';
+		} elseif ($_POST['search-sort-by'] == 'gradient') {
+			$conditions[] = '`t`.`distance` > 0';
+			$conditions[] = '`t`.`elevation` > 0';
+        } elseif ($_POST['search-sort-by'] == 'flight_time' || $_POST['search-sort-by'] == 'flight_ratio') {
+            $conditions[] = '`t`.`cadence` > 0';
+            $conditions[] = '`t`.`groundcontact` > 0';
+		} elseif (in_array($_POST['search-sort-by'], $this->KeysThatShouldIgnoreZero)) {
+			$conditions[] = '`t`.`'.$_POST['search-sort-by'].'` != 0';
+		} elseif (in_array($_POST['search-sort-by'], $this->KeysThatShouldIgnoreNull)) {
+			$conditions[] = '`t`.`'.$_POST['search-sort-by'].'` IS NOT NULL';
+		}
 	}
 
 	/**
 	 * Get limit
 	 * @return string
 	 */
-	private function getLimit() {
-		if ($this->page <= 0)
-			$this->page = 1;
+	protected function getLimit() {
+		if ($this->multiEditorRequested()) {
+			return ' LIMIT '.self::MAX_LIMIT_FOR_MULTI_EDITOR;
+		}
 
-		$limit = ($this->page - 1)*$this->resultsPerPage;
+		if ($this->Page <= 0)
+			$this->Page = 1;
 
-		return ' LIMIT '.$limit.','.$this->resultsPerPage;
+		$limit = ($this->Page - 1)*$this->ResultsPerPage;
+
+		return ' LIMIT '.$limit.','.$this->ResultsPerPage;
 	}
 
 	/**
 	 * Display
 	 */
 	public function display() {
-		if (isset($_POST['send-to-multi-editor'])) {
-			$this->sendResultsToMultiEditor();
-		} else {
-			echo '<div id="'.DATA_BROWSER_SEARCHRESULT_ID.'">';
-			$this->displayResults();
-			echo '</div>';
-		}
+        echo '<div id="searchResult">';
+        $this->displayResults();
+        echo '</div>';
 	}
 
 	/**
-	 * Send results to Multi Editor
+	 * @return bool
 	 */
-	private function sendResultsToMultiEditor() {
-		$IDs = array();
-		foreach ($this->Trainings as $data) {
-			$IDs[] = $data['id'];
-		}
-
-		$_POST['ids'] = implode(',', $IDs);
-
-		$Factory = new PluginFactory();
-		$MultiEditor = $Factory->newInstance('RunalyzePluginTool_MultiEditor');
-
-		if ($MultiEditor) {
-			$MultiEditor->display();
-		} else {
-			echo HTML::error( __('The multi editor could not be located.') );
-		}
-
-		echo Ajax::wrapJS('$("#search").remove();$("#ajax").removeClass("big-window");');
+	public function multiEditorRequested() {
+		return isset($_POST['send-to-multi-editor']);
 	}
+
+    /**
+     * @return int[]
+     */
+	public function getIdsForMultiEditor() {
+	    return array_map(function($data) {
+	        return (int)$data['id'];
+        }, $this->Trainings);
+    }
 
 	/**
 	 * Display results
 	 */
-	private function displayResults() {
-		if (!$this->withResults)
+	protected function displayResults() {
+		if (!$this->WithResults)
 			return;
 
+		$Table = new \Runalyze\View\Dataset\Table($this->DatasetConfig);
+		$Icon = new \Runalyze\View\Icon(Runalyze\View\Icon::INFO);
+
+		echo '<p class="c">'; $this->displayHeader(); echo '</p>';
 		echo '<table class="fullwidth zebra-style">';
-		echo '<thead><tr class="c"><th colspan="'.$this->colspan.'">';
-		$this->displayHeader();
-		echo '</th></tr></thead>';
+		echo '<thead>';
+		echo '<tr style="font-size:.5em;line-height:1;"><td></td>'.$Table->codeForColumnLabels($Icon->code()).'</tr>';
+		echo '</thead>';
 		echo '<tbody>';
 
-		$this->displayTrainingRows();
+		$this->displayTrainingRows($Table);
 
 		echo '</tbody>';
 		echo '</table>';
@@ -337,14 +673,14 @@ class SearchResults {
 	/*
 	 * Display header
 	 */
-	private function displayHeader() {
-		if ($this->page != 1) {
+	protected function displayHeader() {
+		if ($this->Page != 1) {
 			echo '<span id="search-back" class="link">'.Icon::$BACK.'</span>';
 		}
 
-		echo ' '.sprintf( __('Found %s activities'), $this->totalNumberOfTrainings).' ';
+		echo ' '.sprintf( __('Found %s activities'), $this->TotalNumberOfTrainings).' ';
 
-		if ($this->page*$this->resultsPerPage < $this->totalNumberOfTrainings) {
+		if ($this->Page*$this->ResultsPerPage < $this->TotalNumberOfTrainings) {
 			echo '<span id="search-next" class="link">'.Icon::$NEXT.'</span>';
 		}
 
@@ -354,7 +690,7 @@ class SearchResults {
 	/**
 	 * Connect pagination links
 	 */
-	private function connectPagination() {
+	protected function connectPagination() {
 		echo Ajax::wrapJSforDocumentReady(
 			'$("#search-back").click(function(){'.
 				'var $i = $("#search input[name=\'page\']");'.
@@ -370,18 +706,19 @@ class SearchResults {
 	}
 
 	/**
-	 * Display all training rows
+	 * @param \Runalyze\View\Dataset\Table $Table
 	 */
-	private function displayTrainingRows() {	
+	protected function displayTrainingRows(\Runalyze\View\Dataset\Table $Table) {
+		$Context = new \Runalyze\Dataset\Context(new Runalyze\Model\Activity\Entity(), $this->AccountID);
+
 		foreach ($this->Trainings as $training) {
-			$date = date("d.m.Y", $training['time']);
+			$date = (new LocalTime($training['time']))->format("d.m.Y");
 			$link = Ajax::trainingLink($training['id'], $date, true);
+			$Context->setActivityData($training);
 
 			echo '<tr class="r">';
 			echo '<td class="l"><small>'.$link.'</small></td>';
-
-			$this->Dataset->setTrainingId($training['id'], $training);
-			$this->Dataset->displayTableColumns();
+			echo $Table->codeForColumns($Context);
 
 			echo '</tr>';
 		}

@@ -7,7 +7,7 @@
 namespace Runalyze\Configuration\Category;
 
 use Runalyze\Configuration\Fieldset;
-use Runalyze\Parameter\Bool;
+use Runalyze\Parameter\Boolean;
 use Runalyze\Parameter\Application\ActivityRoutePrivacy;
 use Ajax;
 
@@ -29,22 +29,13 @@ class Privacy extends \Runalyze\Configuration\Category {
 	 * Create handles
 	 */
 	protected function createHandles() {
-		$this->createHandle('TRAINING_MAKE_PUBLIC', new Bool(false));
-		$this->createHandle('TRAINING_LIST_PUBLIC', new Bool(false));
-		$this->createHandle('TRAINING_LIST_ALL', new Bool(false));
-		$this->createHandle('TRAINING_LIST_STATISTICS', new Bool(false));
+		$this->createHandle('TRAINING_LIST_PUBLIC', new Boolean(false));
+		$this->createHandle('TRAINING_LIST_ALL', new Boolean(false));
+		$this->createHandle('TRAINING_LIST_STATISTICS', new Boolean(false));
 		$this->createHandle('TRAINING_MAP_PUBLIC_MODE', new ActivityRoutePrivacy());
 	}
 
-	/**
-	 * Publish activity
-	 * @return bool
-	 */
-	public function publishActivity() {
-		return $this->get('TRAINING_MAKE_PUBLIC');
-	}
-
-	/**
+    /**
 	 * List is public
 	 * @return bool
 	 */
@@ -90,29 +81,27 @@ class Privacy extends \Runalyze\Configuration\Category {
 	public function Fieldset() {
 		$Fieldset = new Fieldset( __('Privacy') );
 
-		$Fieldset->addHandle( $this->handle('TRAINING_MAKE_PUBLIC'), array(
-			'label'		=> __('Publish activities'),
-			'tooltip'	=> __('Automatically mark every activity after its creation as public.')
-		));
+        $Fieldset->addInfo( __('You can define the default privacy of new activities by sport type in the associated sport configuration.') );
+
 
 		$Fieldset->addHandle( $this->handle('TRAINING_LIST_PUBLIC'), array(
-			'label'		=> __('Public list: active'),
+			'label'		=> __('Public athlete page: active'),
 			'tooltip'	=> __('If activated: Everyone can see a list of all your (public) activities.')
 		));
 
 		$Fieldset->addHandle( $this->handle('TRAINING_LIST_ALL'), array(
-			'label'		=> __('Public list: private workouts'),
+			'label'		=> __('Public athlete page: private workouts'),
 			'tooltip'	=> __('If activated: Display a summary for each private activity in the public activity list.')
 		));
 
 		$Fieldset->addHandle( $this->handle('TRAINING_LIST_STATISTICS'), array(
-			'label'		=> __('Public list: general statistics'),
+			'label'		=> __('Public athlete page: general statistics'),
 			'tooltip'	=> __('Show some general statistics above the activity list')
 		));
 
 		$Fieldset->addHandle( $this->handle('TRAINING_MAP_PUBLIC_MODE'), array(
-			'label'		=> __('Public view: show map'),
-			'tooltip'	=> __('You can hide the map for the public view'),
+			'label'		=> __('Public activities: show map'),
+			'tooltip'	=> __('You can hide the map for public activities'),
 		));
 
 		return $Fieldset;

@@ -5,110 +5,137 @@
  */
 
 use Runalyze\Configuration;
+use Runalyze\Timezone;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Frontend class for setting up everything
- * 
+ *
  * The frontend initializes everything for Runalyze.
  * It sets the autoloader, constants and mysql-connection.
  * By default, constructing a new frontend will print a html-header.
- * 
+ *
  * Standard initialization of Runalyze:
  * <code>
  *  require 'inc/class.Frontend.php';
  *  $Frontend = new Frontend();
  * </code>
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\Frontend
  */
 class Frontend {
 	/**
-	 * URL for help-window
-	 * @var string
+	 * Symfony token storage for user
+	 * @var null|\Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage
 	 */
-	public static $HELP_URL = 'inc/tpl/tpl.help.php';
+	protected $symfonyToken = null;
 
 	/**
-	 * Boolean flag: log GET- and POST-data
-	 * @var bool
+	 * Yaml Configuration
+	 * @var array
 	 */
-	protected $logGetAndPost = false;
+	protected $yamlConfig = array();
 
-	/**
-	 * Admin password as md5
-	 * @var string
-	 */
-	protected $adminPassAsMD5 = '';
+	protected $HideFooter = false;
 
 	/**
 	 * Constructor
-	 * 
+	 *
 	 * Constructing a new Frontend includes all files and sets the correct header.
 	 * Runalyze is not usable without setting up the environment with this class.
-	 * 
+	 *
 	 * @param bool $hideHeaderAndFooter By default a html-header is directly shown
+	 * @param null|\Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage $symfonyToken
 	 */
-	public function __construct($hideHeaderAndFooter = false) {
+	public function __construct($hideHeaderAndFooter = false, $symfonyToken = null) {
+		$this->symfonyToken = $symfonyToken;
+
 		$this->initSystem();
 		$this->defineConsts();
-		$this->checkConfigFile();
 
 		if (!$hideHeaderAndFooter)
 			$this->displayHeader();
 		else
-			Error::getInstance()->footer_sent = true;
+		    $this->HideFooter = true;
 	}
 
 	/**
 	 * Destructor
 	 */
 	public function __destruct() {
-		if (!Error::getInstance()->footer_sent)
-			$this->displayFooter();
+	    if (!$this->HideFooter)
+    		$this->displayFooter();
 	}
 
 	/**
-	 * Init system 
+	 * Init system
 	 */
 	private function initSystem() {
 		define('RUNALYZE', true);
 		define('FRONTEND_PATH', dirname(__FILE__).'/');
-		date_default_timezone_set('Europe/Berlin');
 
-		$this->initLanguage();
-                $this->initCache();
 		$this->setAutoloader();
-		$this->initErrorHandling();
+		$this->initCache();
+		$this->initConfig();
 		$this->initDatabase();
-		$this->initDebugMode();
 		$this->initSessionAccountHandler();
+		$this->initTimezone();
 		$this->forwardAccountIDtoDatabaseWrapper();
 	}
 
 	/**
-	 * Set up Autloader 
+	 * Set up Autloader
 	 */
 	private function setAutoloader() {
-		require_once FRONTEND_PATH.'/system/class.Autoloader.php';
-		new Autoloader();
+		require_once FRONTEND_PATH.'../vendor/autoload.php';
 	}
 
 	/**
-	 * Setup Language
+	 * Setup config
 	 */
-	private function initLanguage() {
-		require_once FRONTEND_PATH.'/system/class.Language.php';
-		new Language();
+	private function initConfig() {
+		$this->yamlConfig = array_merge(
+			Yaml::parse(file_get_contents(FRONTEND_PATH.'/../app/config/config.yml'))['parameters'],
+            Yaml::parse(file_get_contents(FRONTEND_PATH.'/../app/config/expert_config.yml'))['parameters'],
+            Yaml::parse(file_get_contents(FRONTEND_PATH.'/../app/config/default_config.yml'))['parameters'],
+			Yaml::parse(file_get_contents(FRONTEND_PATH.'/../data/config.yml'))['parameters']
+		);
+
+        define('DARKSKY_API_KEY', $this->yamlConfig['darksky_api_key']);
+        define('OPENWEATHERMAP_API_KEY', $this->yamlConfig['openweathermap_api_key']);
+	    define('NOKIA_HERE_APPID', $this->yamlConfig['nokia_here_appid']);
+	    define('NOKIA_HERE_TOKEN', $this->yamlConfig['nokia_here_token']);
+	    define('THUNDERFOREST_API_KEY', $this->yamlConfig['thunderforest_api_key']);
+        define('MAPBOX_API_KEY', $this->yamlConfig['mapbox_api_key']);
+	    define('PERL_PATH', $this->yamlConfig['perl_path']);
+	    define('TTBIN_PATH', $this->yamlConfig['ttbin_path']);
+	    define('GEONAMES_USERNAME', $this->yamlConfig['geonames_username']);
+	    define('USER_DISABLE_ACCOUNT_ACTIVATION', $this->yamlConfig['user_disable_account_activation']);
+	    define('SQLITE_MOD_SPATIALITE', $this->yamlConfig['sqlite_mod_spatialite']);
+        define('RUNALYZE_VERSION', $this->yamlConfig['RUNALYZE_VERSION']);
+        define('DATA_DIRECTORY', str_replace('%kernel.root_dir%', FRONTEND_PATH.'/../app', $this->yamlConfig['data_directory']));
 	}
-                
+
+	/**
+	 * Setup timezone
+	 */
+	private function initTimezone() {
+		Timezone::setPHPTimezone(SessionAccountHandler::getTimezone());
+		Timezone::setMysql();
+	}
+
         /**
 	 * Setup Language
 	 */
 	private function initCache() {
-                require_once FRONTEND_PATH.'../lib/phpfastcache/phpfastcache.php';
 		require_once FRONTEND_PATH.'/system/class.Cache.php';
-		new Cache();
+
+		try {
+			new Cache();
+		} catch (Exception $E) {
+			die('Cache directory "./'.Cache::PATH.'/cache/" must be writable.');
+		}
 	}
 
 	/**
@@ -119,48 +146,18 @@ class Frontend {
 
 		Configuration::loadAll();
 
+		\Runalyze\Calculation\JD\LegacyEffectiveVO2maxCorrector::setGlobalFactor( Configuration::Data()->vo2maxCorrectionFactor() );
+
 		require_once FRONTEND_PATH.'class.Helper.php';
-	}
-
-	/**
-	 * Check and update if needed config file
-	 */
-	private function checkConfigFile() {
-		AdminView::checkAndUpdateConfigFile();
-	}
-
-	/**
-	 * Include class::Error and and initialise it
-	 */
-	protected function initErrorHandling() {
-		Error::init(Request::Uri());
-
-		if ($this->logGetAndPost) {
-			if (!empty($_POST))
-				Error::getInstance()->addDebug('POST-Data: '.print_r($_POST, true));
-			if (!empty($_GET))
-				Error::getInstance()->addDebug('GET-Data: '.print_r($_GET, true));
-		}
 	}
 
 	/**
 	 * Connect to database
 	 */
 	private function initDatabase() {
-		require_once FRONTEND_PATH.'../config.php';
+		define('PREFIX', $this->yamlConfig['database_prefix']);
 
-		$this->adminPassAsMD5 = md5($password);
-
-		DB::connect($host, $username, $password, $database);
-		unset($host, $username, $password, $database);
-	}
-
-	/**
-	 * Display admin view
-	 */
-	public function displayAdminView() {
-		$AdminView = new AdminView($this->adminPassAsMD5);
-		$AdminView->display();
+		DB::connect($this->yamlConfig['database_host'], $this->yamlConfig['database_port'], $this->yamlConfig['database_user'], $this->yamlConfig['database_password'], $this->yamlConfig['database_name']);
 	}
 
 	/**
@@ -168,6 +165,21 @@ class Frontend {
 	 */
 	protected function initSessionAccountHandler() {
 		new SessionAccountHandler();
+
+		if (!is_null($this->symfonyToken) && $this->symfonyToken->getToken()->getUser() != 'anon.') {
+			/** @var \Runalyze\Bundle\CoreBundle\Entity\Account $user */
+		    $user = $this->symfonyToken->getToken()->getUser();
+
+		    SessionAccountHandler::setAccount(array(
+			    'id' => $user->getId(),
+			    'username' => $user->getUsername(),
+			    'language' => $user->getLanguage(),
+			    'timezone' => $user->getTimezone(),
+			    'mail' => $user->getMail(),
+				'gender' => $user->getGender(),
+				'birthyear' => $user->getBirthyear()
+		    ));
+		}
 	}
 
 	/**
@@ -178,83 +190,20 @@ class Frontend {
 	}
 
 	/**
-	 * Init internal debug-mode. Can be defined in config.php - otherwise is set to false here
-	 */
-	protected function initDebugMode() {
-		if (!defined('RUNALYZE_DEBUG'))
-			define('RUNALYZE_DEBUG', false);
-
-		if (RUNALYZE_DEBUG)
-			error_reporting(E_ALL);
-		else
-			Error::getInstance()->setLogVars(true);
-	}
-
-	/**
-	 * Set correct character encoding 
-	 */
-	final public function setEncoding() {
-		header('Content-type: text/html; charset=utf-8');
-		mb_internal_encoding("UTF-8");
-	}
-
-	/**
 	 * Display the HTML-Header
 	 */
 	public function displayHeader() {
-		$this->setEncoding();
 
 		if (!Request::isAjax() && !isset($_GET['hideHtmlHeader']))
 			include 'tpl/tpl.Frontend.header.php';
-
-		Error::getInstance()->header_sent = true;
 	}
 
 	/**
 	 * Display the HTML-Footer
 	 */
 	public function displayFooter() {
-		if (RUNALYZE_DEBUG && Error::getInstance()->hasErrors()) {
-			Error::getInstance()->display();
-		}
-
 		if (!Request::isAjax() && !isset($_GET['hideHtmlHeader'])) {
 			include 'tpl/tpl.Frontend.footer.php';
 		}
-
-		Error::getInstance()->footer_sent = true;
-	}
-
-	/**
-	 * Display panels
-	 */
-	public function displayPanels() {
-		$Factory = new PluginFactory();
-		$Panels = $Factory->enabledPanels();
-
-		foreach ($Panels as $key) {
-			$Panel = $Factory->newInstance($key);
-			$Panel->display();
-		}
-	}
-
-	/**
-	 * Test a plot
-	 * 
-	 * Will be displayed instead of the DataBrowser - Only for testing purposes!
-	 * @param string $includePath 
-	 * @param string $name
-	 * @param int $width
-	 * @param int $height
-	 */
-	public function testPlot($includePath, $name, $width, $height) {
-		echo '<div id="container"><div id="main"><div id="data-browser" class="panel c"><div class="panel-content">';
-
-		echo Plot::getDivFor($name, $width, $height);
-		include FRONTEND_PATH.$includePath;
-
-		echo '</div></div></div></div>';
-
-		exit();
 	}
 }

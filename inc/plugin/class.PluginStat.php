@@ -3,6 +3,10 @@
  * This file contains class::PluginStat
  * @package Runalyze\Plugin
  */
+
+use Runalyze\Util\Time;
+use Runalyze\Util\LocalTime;
+
 /**
  * Abstract plugin class for statistics
  * @author Hannes Christiansen
@@ -34,6 +38,12 @@ abstract class PluginStat extends Plugin {
 	protected $ShowCompareYearsLink = true;
 
 	/**
+	 * Boolean flag: show last 6/12 months in years-navigation
+	 * @var bool
+	 */
+	protected $ShowTimeRangeLinks = false;
+
+	/**
 	 * Array of links (each wrapped in a <li>-tag
 	 * @var array
 	 */
@@ -49,7 +59,7 @@ abstract class PluginStat extends Plugin {
 	 * @return int
 	 */
 	final public function type() {
-		return PluginType::Stat;
+		return PluginType::STAT;
 	}
 
 	/**
@@ -66,10 +76,12 @@ abstract class PluginStat extends Plugin {
 	 * Set flag for years-navigation
 	 * @param bool $flag
 	 * @param bool $compareFlag [optional]
+	 * @param bool $timeRangeFlag [optional]
 	 */
-	protected function setYearsNavigation($flag = true, $compareFlag = true) {
+	protected function setYearsNavigation($flag = true, $compareFlag = true, $timeRangeFlag = false) {
 		$this->ShowYearsNavigation = $flag;
 		$this->ShowCompareYearsLink = $compareFlag;
+		$this->ShowTimeRangeLinks = $timeRangeFlag;
 	}
 
 	/**
@@ -113,8 +125,8 @@ abstract class PluginStat extends Plugin {
 			$HeaderParts[] = $Sport->name();
 		}
 
-		if ($this->year > 0 && $this->ShowYearsNavigation) {
-			$HeaderParts[] = $this->year;
+		if ($this->ShowYearsNavigation) {
+			$HeaderParts[] = $this->getYearString();
 		}
 
 		if (!empty($HeaderParts)) {
@@ -124,20 +136,74 @@ abstract class PluginStat extends Plugin {
 
 	/**
 	 * Get query for sport and year
+	 * @param bool $addTableName must be used if query contains joins
 	 * @return string
 	 */
-	protected function getSportAndYearDependenceForQuery() {
+	protected function getSportAndYearDependenceForQuery($addTableName = false) {
 		$Query = '';
 
 		if ($this->sportid > 0) {
-			$Query .= ' AND `sportid`='.(int) $this->sportid;
+			$sport = $addTableName ? '`'.PREFIX.'training`.`sportid`' : '`sportid`';
+			$Query .= ' AND '.$sport.'='.(int) $this->sportid;
 		}
 
-		if ($this->year > 0) {
-			$Query .= ' AND YEAR(FROM_UNIXTIME(`time`))='.(int)$this->year;
+		$Query .= $this->getYearDependenceForQuery($addTableName);
+
+		return $Query;
+	}
+
+	/**
+	 * Get query for year
+	 * @param bool $addTableName must be used if query contains joins
+	 * @return string
+	 */
+	protected function getYearDependenceForQuery($addTableName = false) {
+		$Query = '';
+		$time = $addTableName ? '`'.PREFIX.'training`.`time`' : '`time`';
+
+		if ($this->showsLast6Months()) {
+			$Query .= ' AND '.$time.' > '.LocalTime::fromString('first day of -5 months 00:00')->getTimestamp();
+		} elseif ($this->showsLast12Months()) {
+			$Query .= ' AND '.$time.' > '.LocalTime::fromString('first day of -11 months 00:00')->getTimestamp();
+		} elseif (!$this->showsAllYears()) {
+			$Query .= ' AND '.$time.' BETWEEN UNIX_TIMESTAMP(\''.(int)$this->year.'-01-01\') AND UNIX_TIMESTAMP(\''.((int)$this->year+1).'-01-01\')-1 ';
 		}
 
 		return $Query;
+	}
+
+	/**
+	 * Timer for year or ordered months
+	 * @param bool $addTableName must be used if query contains joins
+	 * @return string
+	 */
+	protected function getTimerForOrderingInQuery($addTableName = false) {
+		$time = $addTableName ? '`'.PREFIX.'training`.`time`' : '`time`';
+
+		if ($this->showsAllYears()) {
+			return 'YEAR(FROM_UNIXTIME('.$time.'))';
+		} elseif (!$this->showsSpecificYear()) {
+			return 'DATE_FORMAT(FROM_UNIXTIME('.$time.'), "%Y-%m")';
+		}
+
+		return 'MONTH(FROM_UNIXTIME('.$time.'))';
+	}
+
+	/**
+	 * Index for timer
+	 * @param bool $addTableName must be used if query contains joins
+	 * @return string
+	 */
+	protected function getTimerIndexForQuery($addTableName = false) {
+		$time = $addTableName ? '`'.PREFIX.'training`.`time`' : '`time`';
+
+		if ($this->showsLast6Months()) {
+			return '((MONTH(FROM_UNIXTIME('.$time.')) + 5 - '.date('m').')%12 + 1)';
+		} elseif ($this->showsLast12Months()) {
+			return '((MONTH(FROM_UNIXTIME('.$time.')) + 11 - '.date('m').')%12 + 1)';
+		}
+
+		return $this->getTimerForOrderingInQuery($addTableName);
 	}
 
 	/**
@@ -168,11 +234,11 @@ abstract class PluginStat extends Plugin {
 	 */
 	private function getNavigation() {
 		if ($this->ShowSportsNavigation) {
-			$this->LinkList[] = '<li class="with-submenu"><span class="link">'.__('Choose sport').'</span><ul class="submenu">'.$this->getSportLinksAsList().'</ul>';
+			$this->LinkList[] = '<li class="with-submenu"><span class="link">'.$this->getSportString().'</span><ul class="submenu">'.$this->getSportLinksAsList().'</ul>';
 		}
 
 		if ($this->ShowYearsNavigation) {
-			$this->LinkList[] = '<li class="with-submenu"><span class="link">'.__('Choose year').'</span><ul class="submenu">'.$this->getYearLinksAsList($this->ShowCompareYearsLink).'</ul>';
+			$this->LinkList[] = '<li class="with-submenu"><span class="link">'.$this->getYearString().'</span><ul class="submenu">'.$this->getYearLinksAsList($this->ShowCompareYearsLink, $this->ShowTimeRangeLinks).'</ul>';
 		}
 
 		if (!empty($this->LinkList)) {
@@ -190,12 +256,12 @@ abstract class PluginStat extends Plugin {
 		$Links = '';
 
 		if ($this->ShowAllSportsLink) {
-			$Links .= '<li'.(-1==$this->sportid ? ' class="active"' : '').'>'.$this->getInnerLink(__('All'), -1, $this->year).'</li>';
+			$Links .= '<li'.(-1==$this->sportid ? ' class="active"' : '').'>'.$this->getInnerLink(__('All'), -1, $this->year, $this->dat).'</li>';
 		}
 
-		$Sports = DB::getInstance()->query('SELECT `name`, `id` FROM `'.PREFIX.'sport` ORDER BY `id` ASC')->fetchAll();
-		foreach ($Sports as $Sport) {
-			$Links .= '<li'.($Sport['id']==$this->sportid ? ' class="active"' : '').'>'.$this->getInnerLink($Sport['name'], $Sport['id'], $this->year).'</li>';
+		$Sports = SportFactory::NamesAsArray();
+		foreach ($Sports as $id => $name) {
+			$Links .= '<li'.($id == $this->sportid ? ' class="active"' : '').'>'.$this->getInnerLink($name, $id, $this->year, $this->dat).'</li>';
 		}
 
 		return $Links;
@@ -204,27 +270,81 @@ abstract class PluginStat extends Plugin {
 	/**
 	 * Get links for all years
 	 * @param bool $CompareYears If set, adds a link with year=-1
+	 * @param bool $TimeRanges If set, adds links with year=6/12
+	 * @return string
 	 */
-	private function getYearLinksAsList($CompareYears = true) {
+	private function getYearLinksAsList($CompareYears = true, $TimeRanges = false) {
 		$Links = '';
 
-		if ($CompareYears) { 
-			$Links .= '<li'.(-1==$this->year ? ' class="active"' : '').'>'.$this->getInnerLink($this->titleForAllYears(), $this->sportid, -1).'</li>';
+		if ($CompareYears) {
+			$Links .= '<li'.(-1==$this->year ? ' class="active"' : '').'>'.$this->getInnerLink($this->titleForAllYears(), $this->sportid, -1, $this->dat).'</li>';
+		}
+
+		if ($TimeRanges) {
+			$Links .= '<li'.(6 == $this->year ? ' class="active"' : '').'>'.$this->getInnerLink(__('Last 6 months'), $this->sportid, 6, $this->dat).'</li>';
+			$Links .= '<li'.(12 == $this->year ? ' class="active"' : '').'>'.$this->getInnerLink(__('Last 12 months'), $this->sportid, 12, $this->dat).'</li>';
 		}
 
 		for ($x = date("Y"); $x >= START_YEAR; $x--) {
-			$Links .= '<li'.($x==$this->year ? ' class="active"' : '').'>'.$this->getInnerLink($x, $this->sportid, $x).'</li>';
+			$Links .= '<li'.($x==$this->year ? ' class="active"' : '').'>'.$this->getInnerLink($x, $this->sportid, $x, $this->dat).'</li>';
 		}
 
 		return $Links;
 	}
-		
+
 	/**
 	 * Get the year as string
 	 * @return string
 	 */
 	protected function getYearString() {
-		return ($this->year != -1 ? $this->year : $this->titleForAllYears());
+		if ($this->showsAllYears()) {
+			return $this->titleForAllYears();
+		} elseif ($this->showsLast6Months()) {
+			return __('Last 6 months');
+		} elseif ($this->showsLast12Months()) {
+			return __('Last 12 months');
+		}
+
+		return $this->year;
+	}
+
+	/**
+	 * Get sport as string
+	 * @return string
+	 */
+	protected function getSportString() {
+		return ($this->sportid == -1 ? __('All') : SportFactory::name($this->sportid));
+	}
+
+	/**
+	 * Display an empty th and ths for chosen years/months
+	 * @param bool $prependEmptyTag
+	 * @param string $width
+	 */
+	protected function displayTableHeadForTimeRange($prependEmptyTag = true, $width = '8%') {
+		if ($prependEmptyTag) {
+			echo '<th></th>';
+		}
+
+		if (!empty($width)) {
+			$width = ' width="'.$width.'"';
+		}
+
+		if ($this->showsAllYears()) {
+			$year = date('Y');
+
+			for ($i = START_YEAR; $i <= $year; $i++) {
+				echo '<th'.$width.'>'.$i.'</th>';
+			}
+			echo '<th>'.__('In total').'</th>';
+		} else {
+			$num = $this->showsLast6Months() ? 6 : 12;
+			$add = $this->showsTimeRange() ? date('m') - $num - 1 + 12 : -1;
+
+			for ($i = 1; $i <= 12; $i++) {
+				echo '<th'.$width.'>'.Time::month(($i + $add)%12 + 1, true).'</th>';
+			}
+		}
 	}
 
 	/**
@@ -232,7 +352,7 @@ abstract class PluginStat extends Plugin {
 	 * @return string
 	 */
 	public function getLink() {
-		return '<a rel="statistics" href="'.self::$DISPLAY_URL.'?id='.$this->id().'">'.$this->name().'</a>';
+		return '<a rel="statistics" href="'.self::$DISPLAY_URL.'/'.$this->id().'">'.$this->name().'</a>';
 	}
 
 	/**
@@ -252,14 +372,14 @@ abstract class PluginStat extends Plugin {
 			$year = $this->year;
 		}
 
-		return Ajax::link($name, 'statistics-inner', self::$DISPLAY_URL.'?id='.$this->id().'&sport='.$sport.'&jahr='.$year.'&dat='.$dat);
+		return Ajax::link($name, 'statistics-inner', self::$DISPLAY_URL.'/'.$this->id().'?sport='.$sport.'&jahr='.$year.'&dat='.$dat);
 	}
 
 	/**
 	 * Are various statistics installed?
 	 * @return bool
 	 */
-	static public function hasVariousStats() {
+	public static function hasVariousStats() {
 		$Factory = new PluginFactory();
 		$array = $Factory->variousPlugins();
 
@@ -270,7 +390,7 @@ abstract class PluginStat extends Plugin {
 	 * Get the link for first various statistic
 	 * @return string
 	 */
-	static public function getLinkForVariousStats() {
+	public static function getLinkForVariousStats() {
 		$Factory = new PluginFactory();
 		$array = $Factory->variousPlugins();
 

@@ -1,18 +1,36 @@
-# OS
-.DS_Store
-Thumbs.db
-
 # IDEs
 .buildpath
 .project
 .settings/
 .build/
-.idea/
-nbproject/
+php.ini
 
 #Runalyze
-build/yuicompressor-*
-img/backgrounds/My-*
-lib/phpfastcache/cache.storage.*
-*.xcf
-config.php
+web/assets/v2.x/img/backgrounds/My-*
+data/config.yml
+data/sessions/sess*
+data/timezone.sqlite
+*.mo
+inc/locale/*.po
+web/app_dev.php
+/.htaccess
+
+#composer
+composer.phar
+/vendor/
+
+#assets
+node_modules/
+web/assets/css/*.css
+web/assets/js/*.js
+web/assets/js/*.map
+web/vendor/
+npm-debug.log
+
+#symfony
+/var/
+!/var/cache/.gitkeep
+!/var/logs/.gitkeep
+/app/config/config_test.yml
+
+!.gitkeep

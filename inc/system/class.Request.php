@@ -7,45 +7,22 @@
  * Request
  * @author Hannes Christiansen
  * @package Runalyze\System
+ * @deprecated since v3.1
  */
 class Request {
 	/**
 	 * Get requested URI
 	 * @return string
 	 */
-	static public function Uri() {
-		return $_SERVER['REQUEST_URI'];
-	}
-
-	/**
-	 * Get requested script name
-	 * @return string
-	 */
-	static public function ScriptName() {
-		return $_SERVER['SCRIPT_NAME'];
-	}
-
-	/**
-	 * Get requested filename
-	 * @return string
-	 */
-	static public function Basename() {
-		return basename(self::Uri());
-	}
-
-	/**
-	 * Get current folder of request
-	 * @return string
-	 */
-	static public function CurrentFolder() {
-		return basename(dirname(self::Uri()));
+	public static function Uri() {
+		return isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
 	}
 
 	/**
 	 * Is the user on a shared page?
 	 * @return boolean
 	 */
-	static public function isOnSharedPage() {
+	public static function isOnSharedPage() {
 		return SharedLinker::isOnSharedPage();
 	}
 
@@ -54,7 +31,7 @@ class Request {
 	 * Be careful: Does not work if a file is sent via jQuery!
 	 * @return boolean
 	 */
-	static public function isAjax() {
+	public static function isAjax() {
 		return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 	}
 
@@ -62,7 +39,7 @@ class Request {
 	 * Is request HTTPS?
 	 * @return boolean
 	 */
-	static public function isHttps() {
+	public static function isHttps() {
 		return isset($_SERVER['HTTPS']) && !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off';
 	}
 
@@ -70,7 +47,7 @@ class Request {
 	 * Get protocol (http/https)
 	 * @return string
 	 */
-	static public function getProtocol() {
+	public static function getProtocol() {
 		if (self::isHttps())
 			return 'https';
 
@@ -81,7 +58,7 @@ class Request {
 	 * Get ID send as post or get
 	 * @return mixed
 	 */
-	static public function sendId() {
+	public static function sendId() {
 		if (isset($_GET['id']))
 			return $_GET['id'];
 		if (isset($_POST['id']))
@@ -93,9 +70,9 @@ class Request {
 	/**
 	 * Get parameter send via GET or POST
 	 * @param string $key
-	 * @return string 
+	 * @return string
 	 */
-	static public function param($key) {
+	public static function param($key) {
 		if (isset($_GET[$key]))
 			return $_GET[$key];
 		if (isset($_POST[$key]))

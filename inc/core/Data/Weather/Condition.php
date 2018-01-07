@@ -1,152 +1,118 @@
 <?php
-/**
- * This file contains class::Condition
- * @package Runalyze\Data\Weather
- */
 
 namespace Runalyze\Data\Weather;
 
+use Runalyze\Profile\Weather\WeatherConditionProfile;
 use Runalyze\View\Icon\Weather;
 
-/**
- * Weather condition
- *
- * @author Hannes Christiansen
- * @package Runalyze\Data\Weather
- */
-class Condition {
-	/**
-	 * @var int
-	 */
-	const UNKNOWN = 1;
-
-	/**
-	 * @var int
-	 */
-	const SUNNY = 2;
-
-	/**
-	 * @var int
-	 */
-	const FAIR = 3;
-
-	/**
-	 * @var int
-	 */
-	const CLOUDY = 4;
-
-	/**
-	 * @var int
-	 */
-	const CHANGEABLE = 5;
-
-	/**
-	 * @var int
-	 */
-	const RAINY = 6;
-
-	/**
-	 * @var int
-	 */
-	const SNOWING = 7;
-
-	/**
-	 * Identifier
-	 * @var int
-	 */
+class Condition
+{
+	/** @var int see \Runalyze\Profile\Weather\WeatherConditionProfile */
 	protected $identifier;
 
 	/**
-	 * Complete list
 	 * @return array
 	 */
-	public static function completeList() {
-		return array(
-			self::UNKNOWN,
-			self::SUNNY,
-			self::FAIR,
-			self::CLOUDY,
-			self::CHANGEABLE,
-			self::RAINY,
-			self::SNOWING
-		);
+	public static function completeList()
+	{
+		return WeatherConditionProfile::getEnum();
 	}
 
 	/**
-	 * Weather condition
-	 * @param int $identifier a class constant
+	 * @param int $identifier see \Runalyze\Profile\Weather\WeatherConditionProfile
 	 */
-	public function __construct($identifier) {
+	public function __construct($identifier)
+	{
 		$this->set($identifier);
 	}
 
 	/**
-	 * Set
-	 * @param int $identifier a class constant
+	 * @param int $identifier see \Runalyze\Profile\Weather\WeatherConditionProfile
 	 */
-	public function set($identifier) {
-		$this->identifier = $identifier;
+	public function set($identifier)
+	{
+		if (!in_array($identifier, self::completeList())) {
+			$this->identifier = WeatherConditionProfile::UNKNOWN;
+		} else {
+			$this->identifier = $identifier;
+		}
 	}
 
 	/**
-	 * Identifier
-	 * @return int
+	 * @return int see \Runalyze\Profile\Weather\WeatherConditionProfile
 	 */
-	public function id() {
+	public function id()
+	{
 		return $this->identifier;
 	}
 
 	/**
-	 * Is unknown?
-	 * @return type
+	 * @return bool
 	 */
-	public function isUnknown() {
-		return ($this->identifier == self::UNKNOWN);
+	public function isUnknown()
+	{
+		return (WeatherConditionProfile::UNKNOWN == $this->identifier);
 	}
 
 	/**
-	 * Icon
-	 * @return Runalyze\View\Icon\WeatherIcon
+	 * @return \Runalyze\View\Icon\WeatherIcon
 	 */
-	public function icon() {
+	public function icon()
+	{
 		switch ($this->identifier) {
-			case self::SUNNY:
+			case WeatherConditionProfile::SUNNY:
 				return new Weather\Sunny();
-			case self::FAIR:
+			case WeatherConditionProfile::FAIR:
 				return new Weather\Fair();
-			case self::CLOUDY:
+			case WeatherConditionProfile::CLOUDY:
 				return new Weather\Cloudy();
-			case self::CHANGEABLE:
+			case WeatherConditionProfile::FOGGY:
+				return new Weather\Foggy();
+			case WeatherConditionProfile::CHANGEABLE:
 				return new Weather\Changeable();
-			case self::RAINY:
+			case WeatherConditionProfile::THUNDERSTORM:
+				return new Weather\Thunderstorm();
+			case WeatherConditionProfile::RAINY:
 				return new Weather\Rainy();
-			case self::SNOWING:
+			case WeatherConditionProfile::HEAVYRAIN:
+				return new Weather\Heavyrain();
+			case WeatherConditionProfile::SNOWING:
 				return new Weather\Snowing();
-			case self::UNKNOWN:
+            case WeatherConditionProfile::WINDY:
+                return new Weather\Windy();
+			case WeatherConditionProfile::UNKNOWN:
 			default:
 				return new Weather\Unknown();
 		}
 	}
 
 	/**
-	 * String
 	 * @return string
 	 */
-	public function string() {
+	public function string()
+	{
 		switch ($this->identifier) {
-			case self::SUNNY:
+			case WeatherConditionProfile::SUNNY:
 				return __('sunny');
-			case self::FAIR:
+			case WeatherConditionProfile::FAIR:
 				return __('fair');
-			case self::CLOUDY:
+			case WeatherConditionProfile::CLOUDY:
 				return __('cloudy');
-			case self::CHANGEABLE:
+			case WeatherConditionProfile::CHANGEABLE:
 				return __('changeable');
-			case self::RAINY:
+			case WeatherConditionProfile::RAINY:
 				return __('rainy');
-			case self::SNOWING:
+			case WeatherConditionProfile::SNOWING:
 				return __('snowing');
-			case self::UNKNOWN:
+			case WeatherConditionProfile::HEAVYRAIN:
+				return __('heavy rain');
+			case WeatherConditionProfile::FOGGY:
+				return __('foggy');
+			case WeatherConditionProfile::THUNDERSTORM:
+				return __('thundery');
+            case WeatherConditionProfile::WINDY:
+                return __('windy');
+			case WeatherConditionProfile::UNKNOWN:
 			default:
 				return __('unknown');
 		}

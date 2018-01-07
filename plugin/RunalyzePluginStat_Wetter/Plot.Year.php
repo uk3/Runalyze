@@ -4,7 +4,9 @@
  * Call:   include 'Plot.Year.php'
  * @package Runalyze\Plugins\Stats
  */
+use Runalyze\Activity\Temperature;
 
+$Temperature = new Temperature;
 $Year         = (int)$_GET['y'];
 $Temperatures = array();
 
@@ -15,19 +17,16 @@ $Query = '
 		AVG(`temperature`) as `temp`
 	FROM `'.PREFIX.'training`
 	WHERE
+		`accountid`='.SessionAccountHandler::getId().' AND
 		!ISNULL(`temperature`) AND
-		YEAR(FROM_UNIXTIME(`time`))=:year
+		`time` BETWEEN UNIX_TIMESTAMP(\''.(int)$Year.'-01-01\') AND UNIX_TIMESTAMP(\''.((int)$Year+1).'-01-01\')-1
 	GROUP BY `d`
 	ORDER BY `d` ASC';
 
-$Request = DB::getInstance()->prepare($Query);
-$Request->bindParam('year', $Year);
-$Request->execute();
-
-$Data = $Request->fetchAll();
+$Data = DB::getInstance()->query($Query)->fetchAll();
 
 foreach ($Data as $dat)
-	$Temperatures[$dat['time']] = (int)$dat['temp'];
+	$Temperatures[$dat['time']] = $Temperature->format((int)$dat['temp'], false);
 
 $Plot = new Plot("year".$Year, 780, 240);
 $Plot->Data[] = array('label' => __('Temperatures').' '.$Year, 'data' => $Temperatures);
@@ -36,7 +35,7 @@ $Plot->setMarginForGrid(5);
 $Plot->setXAxisAsTime();
 $Plot->setXAxisLimitedTo($Year);
 $Plot->addYAxis(1, 'left');
-$Plot->addYUnit(1, '°C', 0);
+$Plot->addYUnit(1, $Temperature->unit(), 0);
 $Plot->setYTicks(1, 5, 0);
 
 $Plot->addThreshold('y', 0);

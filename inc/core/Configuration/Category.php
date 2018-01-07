@@ -32,12 +32,12 @@ abstract class Category {
 
 	/**
 	 * Constructor
-	 * 
+	 *
 	 * To load values from database, make sure to call
 	 * <code>$Category->setUserID($id);</code>
-	 * 
+	 *
 	 * Otherwise this object will only contain default values
-	 * 
+	 *
 	 * @todo require database as parameter
 	 */
 	public function __construct() {
@@ -51,9 +51,20 @@ abstract class Category {
 	 * @param array $data values from database
 	 */
 	final public function setUserID($id, $data = null) {
-		if ($id !== $this->UserID) {
+		if ($id !== $this->UserID && $id >= 0) {
 			$this->UserID = (int)$id;
 			$this->loadValues($data);
+		}
+	}
+
+	/**
+	 * @param array $data
+	 */
+	public function setValues(array $data) {
+		foreach ($data as $key => $value) {
+			if (isset($this->Handles[$key])) {
+				$this->Handles[$key]->object()->setFromString($value);
+			}
 		}
 	}
 
@@ -99,7 +110,7 @@ abstract class Category {
 
 	/**
 	 * Fieldset
-	 * @return ConfigurationFieldset
+	 * @return \Runalyze\Configuration\Fieldset
 	 */
 	public function Fieldset() {
 		return null;
@@ -192,7 +203,7 @@ abstract class Category {
 		if (isset($_POST[$key]) || isset($_POST[$key.'_sent'])) {
 			$value = $Handle->value();
 
-			if ($Handle->object() instanceof Parameter\Bool) {
+			if ($Handle->object() instanceof Parameter\Boolean) {
 				$Handle->object()->set( isset($_POST[$key]) );
 			} else {
 				$Handle->object()->setFromString($_POST[$key]);

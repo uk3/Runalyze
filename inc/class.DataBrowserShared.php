@@ -3,6 +3,11 @@
  * This file contains class::DataBrowserShared
  * @package Runalyze\DataBrowser
  */
+
+use Runalyze\Util\LocalTime;
+use Runalyze\Dataset;
+use Runalyze\View;
+
 /**
  * Shared version of DataBrowser
  * @author Hannes Christiansen
@@ -13,22 +18,37 @@ class DataBrowserShared extends DataBrowser {
 	 * Number of additional columns
 	 * @var int
 	 */
-	protected $additionalColumns = 3;
+	protected $AdditionalColumns = 3;
 
 	/**
 	 * Boolean flag: show public link for trainings
 	 * @var boolean
 	 */
-	protected $showPublicLink = true;
+	protected $ShowPublicLink = true;
+
+	/** @var bool */
+	protected $ShowEditLink = false;
+
+	/**
+	 * Init pointer to DB/Error-object
+	 */
+	protected function initInternalObjects()
+	{
+		parent::initInternalObjects();
+
+		if (!\Runalyze\Configuration::Privacy()->showPrivateActivitiesInList()) {
+			$this->DatasetQuery->showOnlyPublicActivities();
+		}
+	}
 
 	/**
 	 * Init private timestamps from request
 	 */
 	protected function initTimestamps() {
-		$this->timestamp_start = isset($_GET['start']) ? $_GET['start'] : mktime(0, 0, 0, date("m"), 1, date("Y"));
-		$this->timestamp_end   = isset($_GET['end'])   ? $_GET['end']   : mktime(23, 59, 50, date("m")+1, 0, date("Y"));
+		$this->TimestampStart = isset($_GET['start']) && is_numeric($_GET['start']) ? $_GET['start'] : LocalTime::fromString('first day of this month 00:00:00')->getTimestamp();
+		$this->TimestampEnd   = isset($_GET['end']) && is_numeric($_GET['end']) ? $_GET['end'] : LocalTime::fromString('last day of this month 23:59:59')->getTimestamp();
 
-		$this->day_count = round(($this->timestamp_end - $this->timestamp_start) / 86400);
+		$this->DayCount = round(($this->TimestampEnd - $this->TimestampStart) / 86400);
 	}
 
 	/**
@@ -48,11 +68,18 @@ class DataBrowserShared extends DataBrowser {
 	}
 
 	/**
+	 * Display hover links
+	 */
+	protected function displayHoverLinks() {
+		echo $this->getRefreshLink();
+	}
+
+	/**
 	 * Get base url
 	 * @return string
 	 */
-	static function getBaseUrl() {
-		return 'shared/'.Request::param('user').'/';
+	public static function getBaseUrl() {
+		return 'athlete/'.Request::param('user').'';
 	}
 
 	/**
@@ -63,26 +90,26 @@ class DataBrowserShared extends DataBrowser {
 	 * @param string $title title for the link
 	 * @return string HTML-link
 	 */
-	static function getLink($name, $start, $end, $title = '') {
+	public static function getLink($name, $start, $end, $title = '') {
 		$href = self::getBaseUrl().'?start='.$start.'&end='.$end;
 
-		return Ajax::link($name, DATA_BROWSER_SHARED_ID, $href, '', $title);
+		return Ajax::link($name, 'publicList', $href, '', $title);
 	}
 
 	/**
 	 * Get URL for month km
 	 * @return string
 	 */
-	static public function getUrlForMonthKm() {
-		return self::getBaseUrl().'?view=monthkm';
+	public static function getUrlForMonthKm() {
+		return self::getBaseUrl().'?type=month';
 	}
 
 	/**
 	 * Get URL for month km
 	 * @return string
 	 */
-	static public function getUrlForWeekKm() {
-		return self::getBaseUrl().'?view=weekkm';
+	public static function getUrlForWeekKm() {
+		return self::getBaseUrl().'?type=week';
 	}
 
 	/**
@@ -99,5 +126,16 @@ class DataBrowserShared extends DataBrowser {
 	 */
 	protected function getWeekKmLink() {
 		return Ajax::window('<a href="'.self::getUrlForWeekKm().'">'.Ajax::tooltip(Icon::$BARS_SMALL, __('Activity per week')).'</a>');
+	}
+
+	/**
+	 * Additional columns that are shown next to date columns
+	 * @param \Runalyze\View\Dataset\Table $table
+	 * @param \Runalyze\Dataset\Context $context
+	 * @return string html string that must contain `$this->AdditionalColumns - 2` columns
+	 */
+	protected function codeForAdditionalColumnsForActivity(View\Dataset\Table $table, Dataset\Context $context)
+	{
+		return $table->codeForPublicIcon($context);
 	}
 }

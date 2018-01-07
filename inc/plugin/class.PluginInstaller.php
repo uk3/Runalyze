@@ -11,7 +11,6 @@
 class PluginInstaller {
 	/**
 	 * Installer id
-	 * @todo Check if this is still needed
 	 */
 	const ID = -1;
 
@@ -19,11 +18,6 @@ class PluginInstaller {
 	 * Install URL
 	 */
 	const INSTALL_URL = 'call/call.Plugin.install.php';
-
-	/**
-	 * Uninstall URL
-	 */
-	const UNINSTALL_URL = 'call/call.Plugin.uninstall.php';
 
 	/**
 	 * Key
@@ -41,7 +35,7 @@ class PluginInstaller {
 
 	/**
 	 * Install
-	 * 
+	 *
 	 * To install a new plugin, it is only needed to insert it into the database.
 	 * Configuration variables will be inserted on the fly.
 	 * @return bool
@@ -62,20 +56,7 @@ class PluginInstaller {
 			'99',
 		));
 
-		return true;
-	}
-
-	/**
-	 * Uninstall
-	 * @return bool
-	 */
-	public function uninstall() {
-		$Factory = new PluginFactory();
-		$Plugin = $Factory->newInstance($this->Key);
-
-		DB::getInstance()->deleteByID('plugin', $Plugin->id());
-
-		// TODO: As soon as a table for plugin_conf exists, remove related rows.
+		PluginFactory::clearCache();
 
 		return true;
 	}
@@ -85,24 +66,11 @@ class PluginInstaller {
 	 * @param string $name [optional] default: add-icon
 	 * @return string
 	 */
-	static public function link($key, $name = '') {
+	public static function link($key, $name = '') {
 		if ($name == '') {
 			$name = Icon::$ADD;
 		}
 
 		return Ajax::window('<a href="'.self::INSTALL_URL.'?key='.$key.'">'.Ajax::tooltip($name, __('Install plugin') ).'</a>');
-	}
-
-	/**
-	 * Get uninstall link
-	 * @param string $name [optional] default: delete-icon
-	 * @return string
-	 */
-	static public function uninstallLink($key, $name = '') {
-		if ($name == '') {
-			$name = Icon::$DELETE;
-		}
-
-		return Ajax::window('<a href="'.self::UNINSTALL_URL.'?key='.$key.'">'.Ajax::tooltip($name, __('Uninstall plugin') ).'</a>');
 	}
 }

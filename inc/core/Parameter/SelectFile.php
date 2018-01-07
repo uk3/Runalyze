@@ -12,6 +12,15 @@ namespace Runalyze\Parameter;
  * @package Runalyze\Parameter
  */
 class SelectFile extends Select {
+	/** @var bool */
+	protected $UseFallback = false;
+
+	/**
+	 * Boolean flag: allow uppercase variants of file extensions
+	 * @var boolean
+	 */
+	protected $AllowUppercaseVariants = true;
+
 	/**
 	 * Construct
 	 * @param string $default
@@ -21,7 +30,8 @@ class SelectFile extends Select {
 		$options = array_merge(
 			array(
 				'folder' => '',
-				'extensions' => array()
+				'extensions' => array(),
+				'filename_only' => true
 			),
 			$options
 		);
@@ -38,17 +48,42 @@ class SelectFile extends Select {
 	}
 
 	/**
+	 * @param boolean $flag
+	 */
+	public function allowUppercaseVariants($flag = true) {
+		$this->AllowUppercaseVariants = $flag;
+	}
+
+	/**
+	 * Set value
+	 * @param mixed $value new value
+	 * @throws \InvalidArgumentException
+	 */
+	public function set($value) {
+		if ($this->Options['filename_only']) {
+			$value = basename($value);
+		}
+
+		parent::set($value);
+	}
+
+	/**
 	 * File allowed?
 	 * @param string $fileName
 	 * @return bool
 	 */
 	protected function valueIsAllowed($fileName) {
 		$firstChar = substr($fileName, 0, 1);
+		$extension = pathinfo($fileName, PATHINFO_EXTENSION);
 
 		if ($firstChar == '.' || $firstChar == '/')
 			return false;
 
-		if (!in_array(pathinfo($fileName, PATHINFO_EXTENSION), $this->Options['extensions']))
+		if ($this->AllowUppercaseVariants) {
+			$extension = strtolower($extension);
+		}
+
+		if (!in_array($extension, $this->Options['extensions']))
 			return false;
 
 		return true;
@@ -69,6 +104,10 @@ class SelectFile extends Select {
 		foreach ($Folder as $Fold) {
 			$handle = opendir(FRONTEND_PATH.'../'.$Fold);
 			if ($handle) {
+				if ($this->Options['filename_only']) {
+					$Fold = '';
+				}
+
 				while (false !== ($file = readdir($handle))) {
 					if ($this->valueIsAllowed($file)) {
 						$Options[$Fold.$file] = $file;

@@ -5,11 +5,12 @@
  */
 /**
  * Extended PDO
- * 
+ *
  * This extended version of the standard PDO class adds 'accountid' when needed
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\System
+ * @deprecated since v3.0
  */
 class PDOforRunalyze extends PDO {
 	/**
@@ -51,13 +52,18 @@ class PDOforRunalyze extends PDO {
 	 * @param string $statement
 	 */
 	protected function addAccountIDtoStatement(&$statement) {
-		if (!is_numeric($this->accountID) || strpos($statement, 'SET NAMES') !== false || strpos($statement, 'TRUNCATE') !== false) {
+		if (!is_numeric($this->accountID) || strpos($statement, 'SET NAMES') !== false || strpos($statement, 'TRUNCATE') !== false || strpos($statement, 'accountid')) {
 			return;
 		}
 
 		if (
 				strpos($statement, PREFIX.'account') === false
 				&& strpos($statement, PREFIX.'plugin_conf') === false
+				&& strpos($statement, PREFIX.'activity_equipment') === false
+				&& strpos($statement, PREFIX.'activity_tag') === false
+				&& strpos($statement, PREFIX.'equipment_sport') === false
+				&& strpos($statement, PREFIX.'weathercache') === false
+				&& strpos($statement, PREFIX.'raceresult') === false
 				&& strpos($statement, '`accountid`') === false
 				&& strpos($statement, 'accountid=') === false
 			) {
@@ -82,8 +88,14 @@ class PDOforRunalyze extends PDO {
 	public function fetchByID($table, $ID) {
 		$table = str_replace(PREFIX, '', $table);
 
-		return $this->query('SELECT * FROM `'.PREFIX.$table.'` WHERE `id`='.(int)$ID.' LIMIT 1')->fetch();
-	}
+		if ($table == 'account' || $table == 'plugin_conf') {
+			return $this->query('SELECT * FROM `'.PREFIX.$table.'` WHERE `id`='.(int)$ID.' LIMIT 1')->fetch();
+		}
+
+		return $this->query('SELECT * FROM `'.PREFIX.$table.'` WHERE `id`='.(int)$ID.' AND `accountid`="'.SessionAccountHandler::getId().'" LIMIT 1')->fetch();
+
+        }
+
 
 	/**
 	 * Fetch row by id
@@ -132,7 +144,7 @@ class PDOforRunalyze extends PDO {
 
 	/**
 	 * Escapes and inserts the given $values to the $columns in $table
-	 * 
+	 *
 	 * This methods always adds the accountid (unless something is inserted to the account table)
 	 * @param $table   string without PREFIX
 	 * @param $columns array
@@ -143,7 +155,7 @@ class PDOforRunalyze extends PDO {
 		$table = str_replace(PREFIX, '', $table);
 
 		// TODO: TEST IT!
-		if ($table != 'account' && $table != 'plugin_conf' && !in_array('accountid', $columns)) {
+		if ($table != 'account' && $table != 'plugin_conf' && $table != 'equipment_sport' && !in_array('accountid', $columns)) {
 			$columns[] = 'accountid';
 			$values[]  = $this->accountID;
 		}
@@ -167,7 +179,7 @@ class PDOforRunalyze extends PDO {
 
 	/**
 	 * Escapes values for safe mysql-queries:
-	 *    - Sets null-objects to 'NULL'
+	 *    - Sets null-objects to 'null'
 	 *    - Sets true/false to 1/0
 	 *    - Sets strings to "$value"
 	 * @param $values mixed might be an array
@@ -189,7 +201,7 @@ class PDOforRunalyze extends PDO {
 		} else if (!is_numeric($values) || $forceAsString) {
 			$values = $this->quote($values);
 
-			if ($quotes == false && substr($values, 0, 1) == "'" && substr($values, -1) == "'" && strlen($values) > 2) {
+			if ($quotes === false && substr($values, 0, 1) == "'" && substr($values, -1) == "'" && strlen($values) > 2) {
 				$values = substr($values, 1, -1);
 			}
 		}
@@ -256,7 +268,6 @@ class PDOforRunalyze extends PDO {
 		if ($this->addsAccountID) {
 			$this->addAccountIDtoStatement($statement);
 		}
-
 		return parent::query($statement);
 	}
 }

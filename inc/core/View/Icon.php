@@ -6,8 +6,6 @@
 
 namespace Runalyze\View;
 
-use Runalyze\View\Tooltip;
-
 /**
  * Icon
  * 
@@ -28,24 +26,44 @@ class Icon {
 	const INFO = 'fa-info-circle';
 
 	/**
+	 * @var string
+	 */
+	const CLOCK = 'fa-clock-o';
+
+	/**
+	 * @var string
+	 */
+	const CLOCK_GRAY = 'fa-clock-o unimportant';
+
+	/**
+	 * @var string
+	 */
+	const HEART = 'fa-heart';
+
+	/**
+	 * @var string
+	 */
+	const MAP_ARROW = 'fa-location-arrow';
+
+	/**
 	 * Key to identfiy FontAwesome icon
 	 * @see http://fontawesome.io/icons/
 	 * @var string
 	 */
-	protected $fontAwesomeName;
+	protected $FontAwesomeName;
 
 	/**
 	 * Text for tooltip
 	 * @var string
 	 */
-	protected $tooltip;
+	protected $Tooltip;
 
 	/**
 	 * Construct new icon
 	 * @param string $fontAwesomeName [optional] class const
 	 */
 	public function __construct($fontAwesomeName) {
-		$this->fontAwesomeName = $fontAwesomeName;
+		$this->FontAwesomeName = $fontAwesomeName;
 	}
 
 	/**
@@ -53,7 +71,7 @@ class Icon {
 	 * @param string $tooltip
 	 */
 	public function setTooltip($tooltip) {
-		$this->tooltip = $tooltip;
+		$this->Tooltip = $tooltip;
 	}
 
 	/**
@@ -68,7 +86,7 @@ class Icon {
 	 * @return string
 	 */
 	public function code() {
-		return '<i class="fa fa-fw '.$this->fontAwesomeName.'"'.$this->tooltipAttributes().'></i>';
+		return '<i class="fa fa-fw '.$this->FontAwesomeName.'"'.$this->tooltipAttributes().'></i>';
 	}
 
 	/**
@@ -76,8 +94,8 @@ class Icon {
 	 * @return string
 	 */
 	protected function tooltipAttributes() {
-		if (!empty($this->tooltip)) {
-			$Tooltip = new Tooltip($this->tooltip);
+		if (!empty($this->Tooltip)) {
+			$Tooltip = new Tooltip($this->Tooltip);
 			return ' '.$Tooltip->attributes();
 		}
 
@@ -89,8 +107,8 @@ class Icon {
 	 * @param string $code
 	 */
 	protected function addTooltipToCode(&$code) {
-		if (!empty($this->tooltip)) {
-			$Tooltip = new Tooltip($this->tooltip);
+		if (!empty($this->Tooltip)) {
+			$Tooltip = new Tooltip($this->Tooltip);
 			$Tooltip->wrapAround($code);
 		}
 	}

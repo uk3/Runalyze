@@ -5,10 +5,13 @@
  */
 
 use Runalyze\Configuration;
+use Runalyze\View\Activity;
+use Runalyze\View\Activity\Linker;
+use Runalyze\View\Activity\Box;
 
 /**
  * Row: Route
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -17,7 +20,7 @@ class SectionRouteRowElevation extends TrainingViewSectionRow {
 	 * Set plot
 	 */
 	protected function setPlot() {
-		$this->Plot = new TrainingPlotElevation($this->Training);
+		$this->Plot = new Activity\Plot\Elevation($this->Context);
 	}
 
 	/**
@@ -25,15 +28,18 @@ class SectionRouteRowElevation extends TrainingViewSectionRow {
 	 */
 	protected function setContent() {
 		$this->addElevation();
+        $this->addClimbScore();
 
 		foreach ($this->BoxedValues as &$Value) {
 			$Value->defineAsFloatingBlock('w50');
 		}
 
-		$this->addCourse();
+		if ($this->Context->hasRoute()) {
+			$this->addCourse();
 
-		if ($this->Training->hasArrayAltitude()) {
-			$this->addInfoLink();
+			if ($this->Context->route()->hasElevations()) {
+				$this->addInfoLink();
+			}
 		}
 	}
 
@@ -41,25 +47,47 @@ class SectionRouteRowElevation extends TrainingViewSectionRow {
 	 * Add: elevation
 	 */
 	protected function addElevation() {
-		if ($this->Training->getDistance() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getDistance(), 'km', __('Distance'));
-			$this->BoxedValues[] = new BoxedValue($this->Training->getElevation(), 'm', __('Elevation'));
+		if ($this->Context->activity()->distance() > 0 || $this->Context->activity()->elevation() > 0) {
+			if ($this->Context->activity()->distance() > 0) {
+				$this->BoxedValues[] = new Box\Distance($this->Context);
+			}
+
+			$this->BoxedValues[] = new Box\Elevation($this->Context);
 
 			// TODO: Calculated elevation?
 
-			if ($this->Training->getElevation() > 0) {
-				$this->BoxedValues[] = new BoxedValue(substr($this->Training->DataView()->getGradientInPercent(),0,-6), '&#37;', __('&oslash; Gradient'));
-				$this->BoxedValues[] = new BoxedValue(substr($this->Training->DataView()->getElevationUpAndDown(),0,-7), 'm', __('Elevation up/down'));
+			if ($this->Context->activity()->elevation() > 0) {
+				if ($this->Context->activity()->distance() > 0) {
+					$this->BoxedValues[] = new Box\Gradient($this->Context);
+				}
+
+				$this->BoxedValues[] = new Box\ElevationUpDown($this->Context);
 			}
 		}
 	}
+
+    protected function addClimbScore() {
+        if (null !== $this->Context->activity()->climbScore()) {
+            $this->BoxedValues[] = new BoxedValue(
+                number_format($this->Context->activity()->climbScore(), 1),
+                '',
+                __('Climb Score')
+            );
+
+            $this->BoxedValues[] = new BoxedValue(
+                round(100 * $this->Context->activity()->percentageHilly()),
+                '&#37;',
+                __('Percentage hilly')
+            );
+        }
+    }
 
 	/**
 	 * Add: course
 	 */
 	protected function addCourse() {
-		if (strlen($this->Training->getRoute()) > 0) {
-			$PathBox = new BoxedValue($this->Training->getRoute(), '', __('Course'));
+		if (strlen($this->Context->route()->name()) > 0) {
+			$PathBox = new BoxedValue($this->Context->route()->name(), '', __('Course'));
 			$PathBox->defineAsFloatingBlock('w100 flexible-height');
 
 			$this->BoxedValues[] = $PathBox;
@@ -70,14 +98,23 @@ class SectionRouteRowElevation extends TrainingViewSectionRow {
 	 * Add info link
 	 */
 	protected function addInfoLink() {
-		$InfoLink = Ajax::window('<a href="'.$this->Training->Linker()->urlToElevationInfo().'">'.__('More about elevation').'</a>', 'small');
+        $this->Footer = '';
 
-		$this->Content = HTML::info( $InfoLink );
+        $Linker = new Linker($this->Context->activity());
 
-		if ($this->Training->elevationWasCorrected())
-			$this->Content .= HTML::info( __('Elevation data were corrected.') );
-		elseif ($this->Training->hasArrayAltitude() && Configuration::ActivityForm()->correctElevation())
-			$this->Content .= HTML::warning( __('Elevation data are not corrected.') );
+        if (null !== $this->Context->activity()->climbScore()) {
+            $this->Footer .= HTML::info(Ajax::window('<a href="'.$Linker->urlToClimbScore().'">'.__('Climb Score view').'</a>', 'normal'));
+        }
+
+		if (!Request::isOnSharedPage()) {
+            $this->Footer .= HTML::info(Ajax::window('<a href="'.$Linker->urlToElevationInfo().'">'.__('More about elevation').'</a>', 'normal'));
+		}
+
+		if ($this->Context->route()->hasCorrectedElevations()) {
+			$this->Footer .= HTML::info( __('Elevation data were corrected.') );
+		} elseif ($this->Context->route()->hasOriginalElevations() && Configuration::ActivityForm()->correctElevation()) {
+			$this->Footer .= HTML::warning( __('Elevation data are not corrected.') );
+		}
 
 		// TODO: Add link to correct them now!
 	}

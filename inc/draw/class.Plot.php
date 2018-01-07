@@ -14,7 +14,7 @@ use Runalyze\Configuration;
 class Plot {
 	/**
 	 * CSS-ID for displaying this plot
-	 * @var unknown_type
+	 * @var string
 	 */
 	private $cssID = '';
 
@@ -43,6 +43,12 @@ class Plot {
 	public $Options = array();
 
 	/**
+	 * Options only used by Runalyze's plot handler
+	 * @var array
+	 */
+	public $PlotOptions = array();
+
+	/**
 	 * Array containing annotations for this plot
 	 * @var array
 	 */
@@ -60,7 +66,7 @@ class Plot {
 	 * @param mixed $width
 	 * @param mixed $height
 	 */
-	function __construct($cssID, $width = 480, $height = 190) {
+	public function __construct($cssID, $width = 480, $height = 190) {
 		$this->width   = $width;
 		$this->height  = $height;
 		$this->cssID   = $cssID;
@@ -79,8 +85,9 @@ class Plot {
 	 * @param string $id
 	 * @param int $width
 	 * @param int $height
+	 * @return string
 	 */
-	static public function getDivFor($id, $width, $height) {
+	public static function getDivFor($id, $width, $height) {
 		return '<div style="position:relative;width:'.$width.'px;height:'.$height.'px;margin:0 auto;">'.self::getInnerDivFor($id, $width, $height).'</div>';
 	}
 
@@ -91,8 +98,9 @@ class Plot {
 	 * @param int $height
 	 * @param bool $hidden
 	 * @param string $class
+	 * @return string
 	 */
-	static public function getInnerDivFor($id, $width, $height, $hidden = false, $class = '') {
+	public static function getInnerDivFor($id, $width, $height, $hidden = false, $class = '') {
 		return '<div class="flot '.Ajax::$IMG_WAIT.' '.$class.($hidden ? ' flot-hide' : '').'" id="'.$id.'" style="width:'.$width.'px;height:'.$height.'px;position:absolute;"></div>';
 	}
 
@@ -130,13 +138,25 @@ class Plot {
 	 * @return string
 	 */
 	private function getMainJS() {
+		$encodedData = json_encode($this->Data);
+
+		if (false === $encodedData) {
+			$this->ErrorString = sprintf('%s (%s: %u)',
+				__('There is an unknown problem with this plot.'),
+				__('Error code'),
+				json_last_error()
+			);
+
+			return $this->getJSForError();
+		}
+
 		return 'RunalyzePlot.addPlot("'.$this->cssID.'", '.
-				json_encode($this->Data).', '.
+				$encodedData.', '.
 				Ajax::json_encode_jsfunc($this->Options).', '.
-				'{}, '.
+				json_encode($this->PlotOptions).', '.
 				json_encode($this->Annotations).');';
 	}
-	
+
 	/**
 	 * Get code for an error
 	 * @return string
@@ -186,7 +206,7 @@ class Plot {
 	}
 
 	/**
-	 * Clear all annotations 
+	 * Clear all annotations
 	 */
 	public function clearAnnotations() {
 		$this->Annotations = array();
@@ -218,13 +238,31 @@ class Plot {
 			$this->Options['series']['points']['lineWidth'] = $size;
 	}
 
-	/**
+    /**
+     * Show series as points
+     * @param int $series
+     */
+    public function showAsPoints($series) {
+        $this->Data[$series]['points']['show'] = true;
+    }
+
+
+    /**
 	* Set line width for series
 	* @param int $series
 	* @param int $width
 	*/
 	public function setLineWidth($series, $width) {
 		$this->Data[$series]['lines']['lineWidth'] = $width;
+	}
+
+	/**
+	 * Set shadow width for series
+	 * @param int $series
+	 * @param int $size
+	 */
+	public function setShadowSize($series, $size) {
+		$this->Data[$series]['shadowSize'] = $size;
 	}
 
 	/**
@@ -256,7 +294,6 @@ class Plot {
 
 			$this->Options['xaxis']['min'] = -1;
 			$this->Options['xaxis']['max'] = $maxLength;
-			//$this->Options['xaxis']['autoscaleMargin'] = 0.02;
 		}
 	}
 
@@ -286,8 +323,8 @@ class Plot {
 	 * Add a marking area
 	 * @param string $axis
 	 * @param double $from
+	 * @param double $to
 	 * @param string $color
-	 * @param int $lineWidth
 	 */
 	public function addMarkingArea($axis, $from, $to, $color ='rgba(255,255,255,0.2)') {
 		$this->Options['grid']['markings'][] = array(
@@ -304,6 +341,14 @@ class Plot {
 	}
 
 	/**
+     * Put grid above data
+     */
+    public function setGridAboveData() {
+        $this->Options['grid']['aboveData'] = true;
+    }
+
+
+	/**
 	 * Set legend as table (not in one line as default)
 	 * @param string $position
 	 */
@@ -316,12 +361,12 @@ class Plot {
 	 * Set specific lines to be filled
 	 * @param array $keys
 	 */
-	public function setLinesFilled($keys = array()) {
+	public function setLinesFilled($keys = array(), $opacity=0.7) {
 		if (empty($keys))
 			$keys = array_keys($this->Data);
 
 		foreach ($keys as $key)
-			$this->Data[$key]['lines']['fill'] = 0.7;
+			$this->Data[$key]['lines']['fill'] = $opacity;
 	}
 
 	/**
@@ -331,9 +376,10 @@ class Plot {
 	 */
 	public function smoothing($flag = true, $fit = null) {
 		$this->Options['series']['curvedLines']['apply'] = $flag;
+		$this->Options['series']['curvedLines']['monotonicFit'] = true;
 
 		if (!is_null($fit))
-			$this->Options['series']['curvedLines']['fit'] = $fit;
+			$this->Options['series']['curvedLines']['monotonicFit'] = $fit;
 	}
 
 	/**
@@ -356,6 +402,21 @@ class Plot {
 	 */
 	public function setXAxisAsTime() {
 		$this->Options['xaxis']['mode'] = "time";
+        $this->Options['xaxis']['monthNames']=	array(
+            __('Jan'),
+            __('Feb'),
+            __('Mar'),
+            __('Apr'),
+            __('May'),
+            __('Jun'),
+            __('Jul'),
+            __('Aug'),
+            __('Sep'),
+            __('Oct'),
+            __('Nov'),
+            __('Dec'),
+        );
+
 	}
 
 	/**
@@ -366,10 +427,9 @@ class Plot {
 		$this->setXAxisAsTime();
 		$this->Options['xaxis']['timeformat'] = $format;
 	}
-
 	/**
 	 * Set x-axis limits to a specific year
-	 * @param int $Year 
+	 * @param int $Year
 	 */
 	public function setXAxisLimitedTo($Year) {
 		$this->Options['xaxis']['min'] = mktime(1,0,0,1,1,$Year).'000';
@@ -377,7 +437,7 @@ class Plot {
 	}
 
 	/**
-	 * Set maximum of x-axis as today 
+	 * Set maximum of x-axis as today
 	 */
 	public function setXAxisMaxToToday() {
 		$this->Options['xaxis']['max'] = time().'000';
@@ -424,13 +484,26 @@ class Plot {
 	}
 
 	/**
+	 * Hide y axis
+	 * @param int $i
+	 */
+	public function hideYAxis($i) {
+		$this->Options['yaxes'][$i-1]['show'] = false;
+	}
+
+	/**
 	 * Add unit to y axis
 	 * @param int $i
 	 * @param string $unit
 	 * @param int $roundTo
+	 * @param float $factor
 	 */
-	public function addYUnit($i, $unit, $roundTo = 2) {
-		$this->Options['yaxes'][$i-1]['tickFormatter'] = 'function (v) { return '.$this->jsRoundUnit($roundTo).' + \' '.$unit.'\'; }';
+	public function addYUnit($i, $unit, $roundTo = 2, $factor = 1) {
+		if ($factor != 1) {
+			$this->Options['yaxes'][$i-1]['tickFormatter'] = 'function (v) { v = v * '.$factor.'; return '.$this->jsRoundUnit($roundTo).' + \' '.$unit.'\'; }';
+		} else {
+			$this->Options['yaxes'][$i-1]['tickFormatter'] = 'function (v) { return '.$this->jsRoundUnit($roundTo).' + \' '.$unit.'\'; }';
+		}
 	}
 
 	/**
@@ -440,6 +513,23 @@ class Plot {
 	 */
 	public function setXUnit($unit, $roundTo = 2) {
 		$this->Options['xaxis']['tickFormatter'] = 'function (v) { return '.$this->jsRoundUnit($roundTo).' + \' '.$unit.'\'; }';
+	}
+
+	/**
+	 * @param string $string
+	 */
+	public function setXLabel($string) {
+		$this->Options['xaxis']['label'] = $string;
+	}
+
+	/**
+	 * Add unit to x axis
+	 * @param float $factor
+	 * @param string $unit
+	 * @param int $roundTo
+	 */
+	public function setXUnitFactor($factor, $unit, $roundTo = 2) {
+		$this->Options['xaxis']['tickFormatter'] = 'function (v) { v = v * '.$factor.'; return '.$this->jsRoundUnit($roundTo).' + \' '.$unit.'\'; }';
 	}
 
 	/**
@@ -458,12 +548,12 @@ class Plot {
 	 * Set size for ticks on y-axis
 	 * @param int $axis
 	 * @param int $tickSize
-	 * @param int $decimals
+	 * @param bool $decimals
 	 */
 	public function setYTicks($axis, $tickSize, $decimals = false) {
 		$this->Options['yaxes'][$axis-1]['minTickSize'] = $tickSize;
 
-		if ($tickSize == null)
+		if ($tickSize === null)
 			unset($this->Options['yaxes'][$axis-1]['minTickSize']);
 
 		if ($decimals !== false)
@@ -483,15 +573,14 @@ class Plot {
 			$diff = $max - $min;
 			if ($factor == 'auto') {
 				$factor = pow(10, round(log10($diff))-1);
+
 				if ($factor > 10)
 					$factor = 10;
 			}
 
-			$min = floor($min/$factor-0.02*$diff)*$factor;
+			$minScaled = $min > 0 ? max(0, $min/$factor - 0.02*$diff) : $min/$factor - 0.02*$diff;
+			$min = floor($minScaled)*$factor;
 			$max = ceil($max/$factor+0.02*$diff)*$factor;
-
-			if ($min < 0)
-				$min = 0;
 
 			$this->setYTicks($axis, $factor);
 		}
@@ -501,8 +590,17 @@ class Plot {
 	}
 
 	/**
+	 * Set y axis labels
+	 * @param int $axis
+	 * @param array $ticks
+	 */
+	public function setYAxisLabels($axis, $ticks) {
+		$this->Options['yaxes'][$axis-1]['ticks'] = $ticks;
+	}
+
+	/**
 	 * Set y axis to reverse
-	 * @param int $axis 
+	 * @param int $axis
 	 */
 	public function setYAxisReverse($axis) {
 		$this->Options['yaxes'][$axis-1]['transform'] = 'function(v){return -v;}';
@@ -510,7 +608,16 @@ class Plot {
 	}
 
 	/**
-	 * Set all zero points to null 
+	 * Set y axis to reverse pace scale
+	 * @param int $axis
+	 */
+	public function setYAxisPaceReverse($axis) {
+		$this->Options['yaxes'][$axis-1]['transform'] = 'function(v){return 1/(v);}';
+		$this->Options['yaxes'][$axis-1]['inverseTransform'] = 'function(v){return 1/v;}';
+	}
+
+	/**
+	 * Set all zero points to null
 	 */
 	public function setZeroPointsToNull() {
 		foreach ($this->Data as $series => $data) {
@@ -521,6 +628,7 @@ class Plot {
 	/**
 	 * Correct special characters like umlaute to unicode-HTML
 	 * @param string $string
+	 * @return string
 	 */
 	public static function correctSpecialChars($string) {
 		$string    = utf8_encode($string);
@@ -534,9 +642,11 @@ class Plot {
 	 * Get JavaScript-timestamp for a day of a year
 	 * @param int $year
 	 * @param int $day
+	 * @param int $hour
+	 * @return int
 	 */
-	static public function dayOfYearToJStime($year, $day) {
-		return mktime(1,0,0,1,$day,$year).'000';
+	public static function dayOfYearToJStime($year, $day, $hour = 12) {
+		return mktime($hour,0,0,1,$day,$year).'000';
 	}
 
 	/**
@@ -544,7 +654,7 @@ class Plot {
 	 * @param array $array
 	 * @return array
 	 */
-	static public function correctValuesForTime($array) {
+	public static function correctValuesForTime($array) {
 		return array_map("PLOT__correctValuesMapperForTime", $array);
 	}
 
@@ -553,20 +663,20 @@ class Plot {
 	 * @param array $array
 	 * @return array
 	 */
-	static public function correctValuesFromPaceToKmh($array) {
+	public static function correctValuesFromPaceToKmh($array) {
 		return array_map("PLOT__correctValuesMapperFromPaceToKmh", $array);
 	}
 }
 
 /**
  * Mapper for Plot::correctValuesForTime
- * 
+ *
  * Correct php-timestamps to JS-timestamps
  * @param mixed $v
  * @return mixed
  */
 function PLOT__correctValuesMapperForTime($v) {
-	return $v*1000;
+	return round($v*1000);
 }
 
 /**
@@ -578,7 +688,7 @@ function PLOT__correctValuesMapperFromPaceToKmh($v) {
 	if ($v == 0)
 		return 0;
 
-	return 3600/$v;
+	return round(3600/$v, 2);
 }
 
 /**

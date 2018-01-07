@@ -7,11 +7,10 @@
 namespace Runalyze\Configuration\Category;
 
 use Runalyze\Configuration\Fieldset;
-use Runalyze\Parameter\Bool;
-use Runalyze\Parameter\String;
+use Runalyze\Parameter\Boolean;
+use Runalyze\Parameter\Textline;
 use Runalyze\Parameter\Set;
 use Runalyze\Parameter\Application\ActivityCreationMode;
-use Runalyze\Parameter\Application\ElevationServer;
 use Runalyze\Parameter\Application\DatabaseOrder;
 use FormularInput;
 
@@ -41,16 +40,16 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	 * Create handles for legends
 	 */
 	private function createHandlesForLegends() {
-		$this->createHandle('FORMULAR_SHOW_SPORT', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_GENERAL', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_DISTANCE', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_SPLITS', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_WEATHER', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_OTHER', new Bool(true));
-		$this->createHandle('FORMULAR_SHOW_NOTES', new Bool(false));
-		$this->createHandle('FORMULAR_SHOW_PUBLIC', new Bool(false));
-		$this->createHandle('FORMULAR_SHOW_ELEVATION', new Bool(false));
-		$this->createHandle('FORMULAR_SHOW_GPS', new Bool(false));
+		$this->createHandle('FORMULAR_SHOW_SPORT', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_GENERAL', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_DISTANCE', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_SPLITS', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_WEATHER', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_OTHER', new Boolean(true));
+		$this->createHandle('FORMULAR_SHOW_NOTES', new Boolean(false));
+		$this->createHandle('FORMULAR_SHOW_PUBLIC', new Boolean(false));
+		$this->createHandle('FORMULAR_SHOW_ELEVATION', new Boolean(false));
+		$this->createHandle('FORMULAR_SHOW_GPS', new Boolean(false));
 	}
 
 	/**
@@ -79,17 +78,16 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	 */
 	private function createHandlesForSettings() {
 		$this->createHandle('TRAINING_CREATE_MODE', new ActivityCreationMode());
-		$this->createHandle('TRAINING_SHOW_AFTER_CREATE', new Bool(false));
-		$this->createHandle('TRAINING_DO_ELEVATION', new Bool(true));
-		$this->createHandle('TRAINING_ELEVATION_SERVER', new ElevationServer());
-		$this->createHandle('TRAINING_LOAD_WEATHER', new Bool(true));
-		$this->createHandle('PLZ', new String(''));
-		$this->createHandle('COMPUTE_KCAL', new Bool(true));
-		$this->createHandle('COMPUTE_POWER', new Bool(true));
+		$this->createHandle('TRAINING_DO_ELEVATION', new Boolean(true));
+		$this->createHandle('TRAINING_LOAD_WEATHER', new Boolean(true));
+		$this->createHandle('PLZ', new Textline(''));
+		$this->createHandle('COMPUTE_KCAL', new Boolean(true));
+		$this->createHandle('COMPUTE_POWER', new Boolean(true));
 		$this->createHandle('TRAINING_SORT_SPORTS', new DatabaseOrder());
 		$this->createHandle('TRAINING_SORT_TYPES', new DatabaseOrder());
 		$this->createHandle('TRAINING_SORT_SHOES', new DatabaseOrder());
 		$this->createHandle('GARMIN_IGNORE_IDS', new Set(array()));
+		$this->createHandle('DETECT_PAUSES', new Boolean(true));
 	}
 
 	/**
@@ -101,27 +99,11 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	}
 
 	/**
-	 * Show activity after creation?
-	 * @return bool
-	 */
-	public function showActivity() {
-		return $this->get('TRAINING_SHOW_AFTER_CREATE');
-	}
-
-	/**
 	 * Correct elevation data?
 	 * @return bool
 	 */
 	public function correctElevation() {
 		return $this->get('TRAINING_DO_ELEVATION');
-	}
-
-	/**
-	 * Server for elevation correction
-	 * @return ElevationServer
-	 */
-	public function elevationServer() {
-		return $this->object('TRAINING_ELEVATION_SERVER');
 	}
 
 	/**
@@ -173,10 +155,10 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	}
 
 	/**
-	 * Order: shoes
+	 * Order: equipment
 	 * @return DatabaseOrder
 	 */
-	public function orderShoes() {
+	public function orderEquipment() {
 		return $this->object('TRAINING_SORT_SHOES');
 	}
 
@@ -198,6 +180,14 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	}
 
 	/**
+	 * Automatically detect pauses
+	 * @return bool
+	 */
+	public function detectPauses(){
+		return $this->get('DETECT_PAUSES');
+	}
+
+	/**
 	 * Fieldset
 	 * @return \Runalyze\Configuration\Fieldset
 	 */
@@ -208,18 +198,19 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 			'label'		=> __('Default window')
 		));
 
-		$Fieldset->addHandle( $this->handle('TRAINING_SHOW_AFTER_CREATE'), array(
-			'label'		=> __('Show activity after creation')
-		));
-
 		$Fieldset->addHandle( $this->handle('COMPUTE_KCAL'), array(
-			'label'		=> __('Calculate calories'),
-			'tooltip'	=> __('Recalculate calories after changing duration by hand')
+			'label'		=> __('Calculate energy'),
+			'tooltip'	=> __('Recalculate energy after changing duration by hand')
 		));
 
 		$Fieldset->addHandle( $this->handle('COMPUTE_POWER'), array(
 			'label'		=> __('Calculate power'),
 			'tooltip'	=> __('Calculate power by speed and grade for cycling')
+		));
+
+		$Fieldset->addHandle( $this->handle('DETECT_PAUSES'), array(
+			'label'		=> __('Detect pauses'),
+			'tooltip'	=> __('Detect pauses (distance not increasing) when importing training')
 		));
 
 		$this->addHandlesForWeatherTo($Fieldset);
@@ -233,7 +224,7 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	 * Add handles for weather to fieldset
 	 * @param \Runalyze\Configuration\Fieldset $Fieldset
 	 */
-	private function addHandlesForWeatherTo(Fieldset &$Fieldset) {
+	private function addHandlesForWeatherTo(Fieldset $Fieldset) {
 		$Fieldset->addHandle( $this->handle('TRAINING_LOAD_WEATHER'), array(
 			'label'		=> __('Automatically load weather conditions'),
 			'tooltip'	=> __('via openweathermap.org')
@@ -250,15 +241,10 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	 * Add handles for elevation to fieldset
 	 * @param \Runalyze\Configuration\Fieldset $Fieldset
 	 */
-	private function addHandlesForElevationTo(Fieldset &$Fieldset) {
+	private function addHandlesForElevationTo(Fieldset $Fieldset) {
 		$Fieldset->addHandle( $this->handle('TRAINING_DO_ELEVATION'), array(
 			'label'		=> __('Automatically correct elevation data'),
 			'tooltip'	=> __('Instead of using gps-elevation a correction via external services is possible.')
-		));
-
-		$Fieldset->addHandle( $this->handle('TRAINING_ELEVATION_SERVER'), array(
-			'label'		=> __('for elevation correction: server'),
-			'tooltip'	=> __('By default, local srtm-files are used. If they are not available, an external server is used.')
 		));
 	}
 
@@ -266,9 +252,9 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 	 * Add handles for sorting to fieldset
 	 * @param \Runalyze\Configuration\Fieldset $Fieldset
 	 */
-	private function addHandlesForSortingTo(Fieldset &$Fieldset) {
+	private function addHandlesForSortingTo(Fieldset $Fieldset) {
 		$Fieldset->addHandle( $this->handle('TRAINING_SORT_SPORTS'), array(
-			'label'		=> __('Sort: sport types')
+			'label'		=> __('Sort: sports')
 		));
 
 		$Fieldset->addHandle( $this->handle('TRAINING_SORT_TYPES'), array(
@@ -276,7 +262,7 @@ class ActivityForm extends \Runalyze\Configuration\Category {
 		));
 
 		$Fieldset->addHandle( $this->handle('TRAINING_SORT_SHOES'), array(
-			'label'		=> __('Sort: shoes')
+			'label'		=> __('Sort: equipment')
 		));
 	}
 }

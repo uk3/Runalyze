@@ -1,170 +1,190 @@
 <?php
-/**
- * This file contains class::Configuration
- * @package Runalyze
- */
 
 namespace Runalyze;
 
 /**
- * Configuration
- * @author Hannes Christiansen
- * @package Runalyze
+ * @deprecated since v3.1
  */
-class Configuration {
-	/**
-	 * Categories
-	 * @var \Runalyze\Configuration\Category[]
-	 */
-	static private $Categories = array();
+class Configuration
+{
+    /** @var \Runalyze\Configuration\Category[] */
+    private static $Categories = array();
 
-	/**
-	 * Values from database
-	 * @var array
-	 */
-	static private $ValuesFromDB = null;
+    /** @var array|null */
+    private static $ValuesFromDB = null;
 
-	/**
-	 * Load all categories
-	 */
-	static public function loadAll() {
-		self::fetchAllValues();
+    /** @var int|null */
+    private static $AccountID = null;
 
-		self::ActivityForm();
-		self::ActivityView();
-		self::Data();
-		self::DataBrowser();
-		self::Design();
-		self::General();
-		self::Misc();
-		self::Privacy();
-		self::Trimp();
-		self::Vdot();
-	}
+    /**
+     * @param mixed $accountid
+     */
+    public static function loadAll($accountid = 'auto')
+    {
+        if ($accountid === 'auto') {
+            self::$AccountID = self::loadAccountID();
+        } else {
+            self::$AccountID = $accountid;
+        }
 
-	/**
-	 * Fetch values
-	 * @return array
-	 */
-	static private function fetchAllValues() {
-		if (self::userID() !== null) {
-			self::$ValuesFromDB = \DB::getInstance()->query('SELECT `key`,`value`,`category` FROM '.PREFIX.'conf WHERE `accountid`="'.self::userID().'"')->fetchAll();
-		} else {
-			self::$ValuesFromDB = array();
-		}
-	}
+        self::fetchAllValues();
+        self::initAllCategories();
+    }
 
-	/**
-	 * User ID
-	 * @return int
-	 */
-	static private function userID() {
-		if (defined('RUNALYZE_TEST'))
-			return null;
+    private static function initAllCategories()
+    {
+        self::ActivityForm();
+        self::ActivityView();
+        self::Data();
+        self::DataBrowser();
+        self::Design();
+        self::General();
+        self::Privacy();
+        self::Trimp();
+        self::VO2max();
+        self::BasicEndurance();
+    }
 
-		if (\AccountHandler::$IS_ON_REGISTER_PROCESS) {
-			$ID = \AccountHandler::$NEW_REGISTERED_ID;
-		} else {
-			$ID = \SessionAccountHandler::getId();
-		}
+    /**
+     * @param mixed $accountid
+     * @throws \InvalidArgumentException
+     */
+    public static function resetConfiguration($accountid = 'auto')
+    {
+        if ($accountid !== 'auto' && !is_numeric($accountid)) {
+            throw new \InvalidArgumentException('Invalid accountid: '.$accountid);
+        }
 
-		return $ID;
-	}
+        if ($accountid === 'auto') {
+            if (null === self::$AccountID) {
+                throw new \InvalidArgumentException('Configuration does not know any accountid.');
+            }
 
-	/**
-	 * Get category
-	 * @param string $categoryName
-	 * @return \Runalyze\Configuration\Category
-	 */
-	static private function get($categoryName) {
-		if (!isset(self::$Categories[$categoryName])) {
-			$className = 'Runalyze\\Configuration\\Category\\'.$categoryName;
-			$Category = new $className();
-			$Category->setUserID(self::userID(), self::$ValuesFromDB);
+            $accountid = self::$AccountID;
+        }
 
-			self::$Categories[$categoryName] = $Category;
-		}
+        \DB::getInstance()->exec('DELETE FROM `'.PREFIX.'conf` WHERE `accountid`="'.$accountid.'" AND `category` != "general" AND `category` != "data"');
 
-		return self::$Categories[$categoryName];
-	}
+        self::initAllCategories();
+    }
 
-	/**
-	 * General
-	 * @return \Runalyze\Configuration\Category\General
-	 */
-	static public function General() {
-		return self::get('General');
-	}
+    private static function fetchAllValues()
+    {
+        self::$Categories = array();
 
-	/**
-	 * Activity view
-	 * @return \Runalyze\Configuration\Category\ActivityView
-	 */
-	static public function ActivityView() {
-		return self::get('ActivityView');
-	}
+        if (self::$AccountID !== null) {
+            self::$ValuesFromDB = \DB::getInstance()->query('SELECT `key`,`value`,`category` FROM '.PREFIX.'conf WHERE `accountid`="'.self::$AccountID.'"')->fetchAll();
+        } else {
+            self::$ValuesFromDB = array();
+        }
+    }
 
-	/**
-	 * Activity form
-	 * @return \Runalyze\Configuration\Category\ActivityForm
-	 */
-	static public function ActivityForm() {
-		return self::get('ActivityForm');
-	}
+    /**
+     * @return int
+     */
+    private static function loadAccountID()
+    {
+        if (defined('RUNALYZE_TEST'))
+            return null;
 
-	/**
-	 * Data browser
-	 * @return \Runalyze\Configuration\Category\DataBrowser
-	 */
-	static public function DataBrowser() {
-		return self::get('DataBrowser');
-	}
+        return \SessionAccountHandler::getId();
+    }
 
-	/**
-	 * Privacy
-	 * @return \Runalyze\Configuration\Category\Privacy
-	 */
-	static public function Privacy() {
-		return self::get('Privacy');
-	}
+    /**
+     * @param string $categoryName
+     * @return \Runalyze\Configuration\Category
+     */
+    private static function get($categoryName)
+    {
+        if (!isset(self::$Categories[$categoryName])) {
+            $className = 'Runalyze\\Configuration\\Category\\'.$categoryName;
+            $Category = new $className();
+            $Category->setUserID(self::$AccountID, self::$ValuesFromDB);
 
-	/**
-	 * Design
-	 * @return \Runalyze\Configuration\Category\Design
-	 */
-	static public function Design() {
-		return self::get('Design');
-	}
+            self::$Categories[$categoryName] = $Category;
+        }
 
-	/**
-	 * Data
-	 * @return \Runalyze\Configuration\Category\Data
-	 */
-	static public function Data() {
-		return self::get('Data');
-	}
+        return self::$Categories[$categoryName];
+    }
 
-	/**
-	 * VDOT
-	 * @return \Runalyze\Configuration\Category\Vdot
-	 */
-	static public function Vdot() {
-		return self::get('Vdot');
-	}
+    /**
+     * @return \Runalyze\Configuration\Category\General
+     */
+    public static function General()
+    {
+        return self::get('General');
+    }
 
-	/**
-	 * Trimp
-	 * @return \Runalyze\Configuration\Category\Trimp
-	 */
-	static public function Trimp() {
-		return self::get('Trimp');
-	}
+    /**
+     * @return \Runalyze\Configuration\Category\ActivityView
+     */
+    public static function ActivityView()
+    {
+        return self::get('ActivityView');
+    }
 
-	/**
-	 * Miscellaneous
-	 * @return \Runalyze\Configuration\Category\Misc
-	 */
-	static public function Misc() {
-		return self::get('Misc');
-	}
+    /**
+     * @return \Runalyze\Configuration\Category\ActivityForm
+     */
+    public static function ActivityForm()
+    {
+        return self::get('ActivityForm');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\DataBrowser
+     */
+    public static function DataBrowser()
+    {
+        return self::get('DataBrowser');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\Privacy
+     */
+    public static function Privacy()
+    {
+        return self::get('Privacy');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\Design
+     */
+    public static function Design()
+    {
+        return self::get('Design');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\Data
+     */
+    public static function Data()
+    {
+        return self::get('Data');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\VO2max
+     */
+    public static function VO2max()
+    {
+        return self::get('VO2max');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\Trimp
+     */
+    public static function Trimp()
+    {
+        return self::get('Trimp');
+    }
+
+    /**
+     * @return \Runalyze\Configuration\Category\BasicEndurance
+     */
+    public static function BasicEndurance()
+    {
+        return self::get('BasicEndurance');
+    }
+
 }

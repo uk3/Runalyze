@@ -13,7 +13,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	protected $object;
 
 	/**
-	 * Test empty splits 
+	 * Test empty splits
 	 * @covers Splits::areEmpty
 	 */
 	public function testEmpty() {
@@ -50,7 +50,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * Test adding splits 
+	 * Test adding splits
 	 * @covers Splits::addSplit
 	 */
 	public function testAddSplit() {
@@ -60,7 +60,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 		$Splits->addSplit(1, 360, false);
 
 		$this->assertTrue( !$Splits->areEmpty() );
-		$this->assertEquals( '1.00|5:00-1.00|4:20-R1.00|6:00', $Splits->asString() );
+		$this->assertEquals( '1.000|5:00-1.000|4:20-R1.000|6:00', $Splits->asString() );
 	}
 
 	/**
@@ -84,7 +84,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	}
 
 	/**
-	 * Test creationg from post without flag 
+	 * Test creationg from post without flag
 	 */
 	public function testNoCreateFromPostWithoutFlag() {
 		$_POST['splits'] = '1|4:20-2.4|10:09-10|1:00:00';
@@ -97,42 +97,19 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	/**
 	 * Test creation from post
 	 */
-	public function testCreateFromPostString() {
-		$_POST['splits'] = '1|4:20-2.4|10:09-10|1:00:00';
-
-		$Splits = new Splits( Splits::$FROM_POST );
-		$this->assertEquals( '1.00|4:20-2.40|10:09-10.00|1:00:00', $Splits->asString() );
-	}
-
-	/**
-	 * Test creation from post
-	 */
-	public function testCreateFromPostArray() {
-		$_POST['splits'] = array(
-			'km' => array(1.2, 0.4, 1),
-			'time' => array('5:20', '1:20', '3:17')
-		);
-
-		$Splits = new Splits( Splits::$FROM_POST );
-		$this->assertEquals( '1.20|5:20-0.40|1:20-1.00|3:17', $Splits->asString() );
-	}
-
-	/**
-	 * Test creation from post
-	 */
 	public function testCreateFromArray() {
 		$Splits = new Splits( array(
 			'km' => array(1.2, 0.4, 1),
 			'time' => array('5:20', '1:20', '3:17')
 		) );
-		$this->assertEquals( '1.20|5:20-0.40|1:20-1.00|3:17', $Splits->asString() );
+		$this->assertEquals( '1.200|5:20-0.400|1:20-1.000|3:17', $Splits->asString() );
 
 		$Splits2 = new Splits( array(
 			'km' => array(1.2, 0.4, 1),
 			'time' => array('5:20', '1:20', '3:17'),
 			'active' => array(false, true, true)
 		) );
-		$this->assertEquals( 'R1.20|5:20-0.40|1:20-1.00|3:17', $Splits2->asString() );
+		$this->assertEquals( 'R1.200|5:20-0.400|1:20-1.000|3:17', $Splits2->asString() );
 	}
 
 	/**
@@ -169,7 +146,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	 */
 	public function testAsString() {
 		$Splits = new Splits('1|4:20-2.4|10:09-10|1:00:00-R1|6:00');
-		$this->assertEquals( '1.00|4:20-2.40|10:09-10.00|1:00:00-R1.00|6:00', $Splits->asString() );
+		$this->assertEquals( '1.000|4:20-2.400|10:09-10.000|1:00:00-R1.000|6:00', $Splits->asString() );
 	}
 
 	/**
@@ -178,8 +155,8 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	public function testAsReadableString() {
 		$Splits = new Splits('1|4:20-1|4:09-R1|6:00');
 
-		$this->assertEquals( '1.00&nbsp;km&nbsp;in&nbsp;4:20, 1.00&nbsp;km&nbsp;in&nbsp;4:09', $Splits->asReadableString() );
-		$this->assertEquals( '1.00&nbsp;km&nbsp;in&nbsp;4:20, 1.00&nbsp;km&nbsp;in&nbsp;4:09, 1.00&nbsp;km&nbsp;in&nbsp;6:00&nbsp;(Resting)', $Splits->asReadableString(true) );
+		$this->assertEquals( '1.000&nbsp;km&nbsp;in&nbsp;4:20, 1.000&nbsp;km&nbsp;in&nbsp;4:09', $Splits->asReadableString() );
+		$this->assertEquals( '1.000&nbsp;km&nbsp;in&nbsp;4:20, 1.000&nbsp;km&nbsp;in&nbsp;4:09, 1.000&nbsp;km&nbsp;in&nbsp;6:00&nbsp;(Resting)', $Splits->asReadableString(true) );
 	}
 
 	/**
@@ -188,7 +165,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 	public function testRemoveSecondsFormat() {
 		$Splits = new Splits('1|4:20-0.2|35,00s');
 
-		$this->assertEquals( '1.00|4:20-0.20|0:35', $Splits->asString() );
+		$this->assertEquals( '1.000|4:20-0.200|0:35', $Splits->asString() );
 		$this->assertEquals( array(
 				array('km' => 1, 'time' => '4:20', 'active' => true),
 				array('km' => 0.2, 'time' => '0:35', 'active' => true)
@@ -205,7 +182,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 			array(0.5, 1, 1.9, 2.1, 2.7)
 		);
 
-		$this->assertEquals( '1.00|4:00-1.00|3:55-1.00|4:05', $Splits->asString() );
+		$this->assertEquals( '1.000|4:00-1.000|3:55-1.000|4:05', $Splits->asString() );
 	}
 
 	/**
@@ -218,7 +195,7 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 			array(0.5, 1, 1.9, 2.1, 2.7)
 		);
 
-		$this->assertEquals( '1.00|4:00-1.10|3:55-0.60|4:05', $Splits->asString() );
+		$this->assertEquals( '1.000|4:00-1.100|3:55-0.600|4:05', $Splits->asString() );
 	}
 
 	public function testHasActiveLaps() {
@@ -242,6 +219,31 @@ class SplitsTest extends PHPUnit_Framework_TestCase {
 		$Splits->addSplit(1, 300);
 
 		$this->assertNotEquals( '', $Splits->asIconWithTooltip() );
+	}
+
+	public function testCompletingSplits() {
+		$Splits = new Splits();
+		$Splits->addSplit(1, 300);
+		$Splits->addSplit(1, 300);
+		$Splits->addSplit(1, 300);
+		$Splits->addLastSplitToComplete(4.5, 1350);
+
+		$asArray1 = $Splits->asArray();
+		$this->assertEquals(4, count($asArray1));
+		$this->assertEquals(1.5, $asArray1[3]['km']);
+		$this->assertEquals('7:30', $asArray1[3]['time']);
+
+		$Splits->addLastSplitToComplete(5, 1500);
+
+		$asArray2 = $Splits->asArray();
+		$this->assertEquals(5, count($asArray2));
+		$this->assertEquals(0.5, $asArray2[4]['km']);
+		$this->assertEquals('2:30', $asArray2[4]['time']);
+
+		$Splits->addLastSplitToComplete(4, 1200);
+
+		$asArray3 = $Splits->asArray();
+		$this->assertEquals(5, count($asArray3));
 	}
 
 }

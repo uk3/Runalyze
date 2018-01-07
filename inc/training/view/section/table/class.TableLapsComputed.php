@@ -3,9 +3,15 @@
  * This file contains class::TableLapsComputed
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\Activity\Elevation;
+use Runalyze\Configuration;
+use Runalyze\Model\Trackdata;
+use Runalyze\Data\Laps\Laps;
+
 /**
  * Table: computed laps
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -20,52 +26,59 @@ class TableLapsComputed extends TableLapsAbstract {
 	 * Set code
 	 */
 	protected function setCode() {
-		$this->initData();
+		$this->constructLaps();
 		$this->setDataToCode();
 	}
 
 	/**
-	 * Init data
+	 * Construct laps
 	 */
-	protected function initData() {
-		$Rounds = $this->Training->GpsData()->getRoundsAsFilledArray();
+	protected function constructLaps() {
+		$singleDistance = Configuration::General()->distanceUnitSystem()->distanceToKmFactor();
+		$totalDistance = $this->Context->trackdata()->totalDistance();
 
-		foreach ($Rounds as $Round) {
-			$this->Data[] = array(
-				'time'      => Time::toString($Round['time']),
-				'distance'  => Running::Km($Round['distance'], 2),
-				'laptime'	=> Time::toString($Round['s']),
-				'pace'      => SportFactory::getSpeedWithAppendixAndTooltip($Round['km'], $Round['s'], $this->Training->Sport()->id()),
-				'heartrate' => Helper::Unknown($Round['heartrate']),
-				'elevation' => Math::WithSign($Round['hm-up']).'/'.Math::WithSign(-$Round['hm-down']));
+		if ($totalDistance < 2*$singleDistance) {
+			$Distances = array($singleDistance);
+		} else {
+			$Distances = range($singleDistance, $totalDistance, $singleDistance);
+
+			if (false === $Distances) {
+				$Distances = array($singleDistance);
+			}
 		}
+
+		$this->Laps = new Laps();
+		$this->Laps->calculateFrom($Distances, $this->Context->trackdata(), $this->Context->route());
 	}
 
 	/**
 	 * Display data
 	 */
 	protected function setDataToCode() {
-		$showCellForHeartrate = $this->Training->GpsData()->hasHeartrateData();
-		$showCellForElevation = $this->Training->GpsData()->hasElevationData();
+		$showCellForHeartrate = $this->Context->trackdata()->has(Trackdata\Entity::HEARTRATE);
+		$showCellForElevation = $this->Context->hasRoute() && $this->Context->route()->hasElevations();
 
 		$this->Code .= '<table class="fullwidth zebra-style">';
 		$this->Code .= '<thead><tr>';
 		$this->Code .= '<th>'.__('Distance').'</th>';
 		$this->Code .= '<th>'.__('Time').'</th>';
 		$this->Code .= '<th>'.__('Pace').'</th>';
-		if ($showCellForHeartrate) $this->Code .= '<th>'.__('bpm').'</th>';
+		if ($showCellForHeartrate) $this->Code .= '<th>'.__('avg.').' '.__('bpm').'</th>';
 		if ($showCellForElevation) $this->Code .= '<th>'.__('elev.').'</th>';
 		$this->Code .= '</tr></thead>';
 
 		$this->Code .= '<tbody>';
 
-		foreach ($this->Data as $Info) {
+		$unit = $this->Context->sport()->legacyPaceUnit();
+		foreach ($this->Laps->objects() as $Lap) {
+			$Lap->pace()->setUnit($unit);
+
 			$this->Code .= '<tr class="r">';
-			$this->Code .= '<td>'.$Info['distance'].'</td>';
-			$this->Code .= '<td>'.$Info['time'].'</td>';
-			$this->Code .= '<td>'.$Info['pace'].'</td>';
-			if ($showCellForHeartrate) $this->Code .= '<td>'.$Info['heartrate'].'</td>';
-			if ($showCellForElevation) $this->Code .= '<td>'.$Info['elevation'].'</td>';
+			$this->Code .= '<td>'.$Lap->trackDistance()->string().'</td>';
+			$this->Code .= '<td>'.$Lap->trackDuration()->string().'</td>';
+			$this->Code .= '<td>'.$Lap->pace()->value().'<small>'.$Lap->pace()->appendix().'</small></td>';
+			if ($showCellForHeartrate) $this->Code .= '<td>'.$Lap->HRavg()->inBPM().'<small>bpm</small></td>';
+			if ($showCellForElevation) $this->Code .= '<td class="c">+'.Elevation::format($Lap->elevationUp(), false).'/-'.Elevation::format($Lap->elevationDown(), false).'</td>';
 			$this->Code .= '</tr>';
 		}
 

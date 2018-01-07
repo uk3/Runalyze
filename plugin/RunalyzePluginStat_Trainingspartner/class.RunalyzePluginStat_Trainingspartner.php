@@ -49,7 +49,7 @@ class RunalyzePluginStat_Trainingspartner extends PluginStat {
 	 */
 	protected function prepareForDisplay() {
 		$this->setSportsNavigation(true, true);
-		$this->setYearsNavigation(true, true);
+		$this->setYearsNavigation(true, true, true);
 
 		$this->setHeaderWithSportAndYear();
 
@@ -69,7 +69,7 @@ class RunalyzePluginStat_Trainingspartner extends PluginStat {
 	 * @return string
 	 */
 	protected function titleForAllYears() {
-		return 'Gesamt';
+		return __('All years');
 	}
 
 	/**
@@ -113,7 +113,7 @@ class RunalyzePluginStat_Trainingspartner extends PluginStat {
 
 		echo '<p class="text">';
 		echo sprintf( __('You have trained <strong>%sx</strong> in total and out of that <strong>%sx</strong> with a training partner, '), $this->TrainingsTotal, $this->TrainingsWithPartner );
-		echo sprintf( __('that are <strong>%s</strong> &#37;.'), round(100*$this->TrainingsWithPartner/$this->TrainingsTotal) );
+		echo sprintf( __('that are <strong>%s</strong> &#37;.'), $this->TrainingsTotal == 0 ? 0 : round(100*$this->TrainingsWithPartner/$this->TrainingsTotal) );
 		echo '</p>';
 	}
 
@@ -121,13 +121,13 @@ class RunalyzePluginStat_Trainingspartner extends PluginStat {
 	 * Init all trainingspartner
 	 */
 	protected function initTrainingspartner() {
-		$Query = 'SELECT `partner` FROM `'.PREFIX.'training` WHERE `partner`!=""';
+		$Query = 'SELECT `partner` FROM `'.PREFIX.'training` WHERE `accountid`='.SessionAccountHandler::getId().' AND `partner`!=""';
 		$Query .= $this->getSportAndYearDependenceForQuery();
 
 		$trainings = DB::getInstance()->query($Query)->fetchAll();
 
 		$this->TrainingsWithPartner = count($trainings);
-		$this->TrainingsTotal = DB::getInstance()->query('SELECT COUNT(*) FROM `'.PREFIX.'training` WHERE 1'.$this->getSportAndYearDependenceForQuery())->fetchColumn();
+		$this->TrainingsTotal = DB::getInstance()->query('SELECT COUNT(*) FROM `'.PREFIX.'training` WHERE 1'.$this->getSportAndYearDependenceForQuery().' AND accountid = '.SessionAccountHandler::getId())->fetchColumn();
 
 		if (empty($trainings))
 			return;

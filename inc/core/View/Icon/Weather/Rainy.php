@@ -9,7 +9,7 @@ namespace Runalyze\View\Icon\Weather;
 /**
  * Weather icon: Rainy
  * @author Hannes Christiansen
- * @package Runalyze\View\Icon\„eather
+ * @package Runalyze\View\Icon\Weather
  */
 class Rainy extends \Runalyze\View\Icon\WeatherIcon {
 	/**
@@ -17,6 +17,6 @@ class Rainy extends \Runalyze\View\Icon\WeatherIcon {
 	 */
 	protected function setLayer() {
 		$this->setBaseClass('weather-basecloud');
-		$this->setLayerClass('weather-showers');
+		$this->setLayerClass('weather-drizzle');
 	}
 }

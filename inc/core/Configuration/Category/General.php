@@ -8,8 +8,13 @@ namespace Runalyze\Configuration\Category;
 
 use Runalyze\Configuration\Fieldset;
 use Runalyze\Parameter\SelectRow;
-use Runalyze\Parameter\Application\Gender;
 use Runalyze\Parameter\Application\HeartRateUnit;
+use Runalyze\Parameter\Application\DistanceUnitSystem;
+use Runalyze\Parameter\Application\WeekStart;
+use Runalyze\Parameter\Application\TemperatureUnit;
+use Runalyze\Parameter\Application\WeightUnit;
+use Runalyze\Parameter\Application\EnergyUnit;
+
 use Ajax;
 
 /**
@@ -30,29 +35,92 @@ class General extends \Runalyze\Configuration\Category {
 	 * Create handles
 	 */
 	protected function createHandles() {
-		$this->createGender();
+        $this->createWeekStart();
+		$this->createDistanceUnitSystem();
+		$this->createWeightUnit();
+		$this->createEnergyUnit();
+        $this->createTemperatureUnit();
 		$this->createHeartRateUnit();
 		$this->createMainSport();
 		$this->createRunningSport();
-		$this->createCompetitionType();
-		$this->createLongRunType();
 	}
 
 	/**
-	 * Create: GENDER
+	 * Create: Beginning of the week
 	 */
-	protected function createGender() {
-		$this->createHandle('GENDER', new Gender());
+	protected function createWeekStart() {
+		$this->createHandle('WEEK_START', new WeekStart());
+	}
+        
+	/**
+	 * WeekStart
+	 * @return \Runalyze\Parameter\Application\WeekStart
+	 */
+	public function weekStart() {
+		return $this->object('WEEK_START');
+	}
+        
+	/**
+	 * Create: DISTANCE_UNIT_SYSTEM
+	 */
+	protected function createDistanceUnitSystem() {
+		$this->createHandle('DISTANCE_UNIT_SYSTEM', new DistanceUnitSystem());
+	}
+	
+	/**
+	 * Unit system for distances
+	 * @return \Runalyze\Parameter\Application\DistanceUnitSystem
+	 */
+	public function distanceUnitSystem() {
+		return $this->object('DISTANCE_UNIT_SYSTEM');
 	}
 
 	/**
-	 * Gender
-	 * @return Gender
+	 * Create: WeightUnit
 	 */
-	public function gender() {
-		return $this->object('GENDER');
+	protected function createWeightUnit() {
+		$this->createHandle('WEIGHT_UNIT', new WeightUnit());
+	}
+	
+	/**
+	 * weight Unit
+	 * @return \Runalyze\Parameter\Application\WeightUnit
+	 */
+	public function weightUnit() {
+		return $this->object('WEIGHT_UNIT');
+	}
+	
+	/**
+	 * Create: EnergyUnit
+	 */
+	protected function createEnergyUnit() {
+		$this->createHandle('ENERGY_UNIT', new EnergyUnit());
+	}
+	
+	
+	/**
+	 * energy Unit
+	 * @return \Runalyze\Parameter\Application\EnergyUnit
+	 */
+	public function energyUnit() {
+		return $this->object('ENERGY_UNIT');
 	}
 
+	/**
+	 * Create: TemperatureUnit
+	 */
+	protected function createTemperatureUnit() {
+		$this->createHandle('TEMPERATURE_UNIT', new TemperatureUnit());
+	}
+	
+	/**
+	 * temperature Unit
+	 * @return \Runalyze\Parameter\Application\TemperatureUnit
+	 */
+	public function temperatureUnit() {
+		return $this->object('TEMPERATURE_UNIT');
+	}
+        
 	/**
 	 * Create: HEART_RATE_UNIT
 	 */
@@ -105,51 +173,17 @@ class General extends \Runalyze\Configuration\Category {
 	}
 
 	/**
-	 * Create: TYPE_ID_RACE
-	 */
-	protected function createCompetitionType() {
-		$this->createHandle('TYPE_ID_RACE', new SelectRow(5, array(
-			'table'			=> 'type',
-			'column'		=> 'name'
-		)));
-	}
-
-	/**
-	 * Competition type
-	 * @return int
-	 */
-	public function competitionType() {
-		return $this->get('TYPE_ID_RACE');
-	}
-
-	/**
-	 * Create: TYPE_ID_LONGRUN
-	 */
-	protected function createLongRunType() {
-		$this->createHandle('TYPE_ID_LONGRUN', new SelectRow(7, array(
-			'table'			=> 'type',
-			'column'		=> 'name'
-		)));
-	}
-
-	/**
-	 * Long run type
-	 * @return int
-	 */
-	public function longRunType() {
-		return $this->get('TYPE_ID_LONGRUN');
-	}
-
-	/**
 	 * Register onchange events
 	 */
 	protected function registerOnchangeEvents() {
-		$this->handle('GENDER')->registerOnchangeFlag(Ajax::$RELOAD_ALL);
+		$this->handle('DISTANCE_UNIT_SYSTEM')->registerOnchangeFlag(Ajax::$RELOAD_ALL);
+		$this->handle('ENERGY_UNIT')->registerOnchangeFlag(Ajax::$RELOAD_ALL);
+		$this->handle('DISTANCE_UNIT_SYSTEM')->registerOnchangeEvent('Runalyze\\Configuration\\Messages::adjustPacesInSportsConfiguration');
+		$this->handle('WEIGHT_UNIT')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
+                $this->handle('TEMPERATURE_UNIT')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
 		$this->handle('HEART_RATE_UNIT')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
+                $this->handle('WEEK_START')->registerOnchangeFlag(Ajax::$RELOAD_PAGE);
 		$this->handle('MAINSPORT')->registerOnchangeFlag(Ajax::$RELOAD_PAGE);
-		$this->handle('RUNNINGSPORT')->registerOnchangeFlag(Ajax::$RELOAD_PAGE);
-		$this->handle('TYPE_ID_RACE')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
-		$this->handle('TYPE_ID_LONGRUN')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
 	}
 
 	/**
@@ -158,9 +192,26 @@ class General extends \Runalyze\Configuration\Category {
 	 */
 	public function Fieldset() {
 		$Fieldset = new Fieldset( __('General settings') );
+                
+		$Fieldset->addHandle( $this->handle('WEEK_START'), array(
+			'label'		=> __('Beginning of the week')
+		));
 
-		$Fieldset->addHandle( $this->handle('GENDER'), array(
-			'label'		=> __('Gender')
+		$Fieldset->addHandle( $this->handle('DISTANCE_UNIT_SYSTEM'), array(
+			'label'		=> __('Unit system for distances'),
+			'tooltip'	=> __('Changing the unit system for distances does not change pace units. You have to adjust them in sports configuration.')
+		));
+
+		$Fieldset->addHandle( $this->handle('WEIGHT_UNIT'), array(
+			'label'		=> __('Weight unit')
+		));
+		
+		$Fieldset->addHandle( $this->handle('ENERGY_UNIT'), array(
+			'label'		=> __('Energy unit')
+		));	
+                
+		$Fieldset->addHandle( $this->handle('TEMPERATURE_UNIT'), array(
+			'label'		=> __('Temperature unit')
 		));
 
 		$Fieldset->addHandle( $this->handle('HEART_RATE_UNIT'), array(
@@ -169,18 +220,6 @@ class General extends \Runalyze\Configuration\Category {
 
 		$Fieldset->addHandle( $this->handle('MAINSPORT'), array(
 			'label'		=> __('Main sport')
-		));
-
-		$Fieldset->addHandle( $this->handle('RUNNINGSPORT'), array(
-			'label'		=> __('Running sport')
-		));
-
-		$Fieldset->addHandle( $this->handle('TYPE_ID_RACE'), array(
-			'label'		=> __('Activity type: competition')
-		));
-
-		$Fieldset->addHandle( $this->handle('TYPE_ID_LONGRUN'), array(
-			'label'		=> __('Activity type: long run')
 		));
 
 		return $Fieldset;

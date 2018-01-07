@@ -5,6 +5,11 @@
  */
 
 use Runalyze\Configuration;
+use Runalyze\Dataset;
+use Runalyze\Model\Factory;
+use Runalyze\Util\Time;
+use Runalyze\Util\LocalTime;
+use Runalyze\View;
 
 /**
  * DataBrowser
@@ -16,73 +21,73 @@ class DataBrowser {
 	 * CSS-ID for calendar-widget
 	 * @var string
 	 */
-	static public $CALENDAR_ID = 'data-browser-calendar';
+	const CALENDAR_ID = 'data-browser-calendar';
 
 	/**
 	 * CSS-ID for refresh button
 	 * @var string
 	 */
-	static public $REFRESH_BUTTON_ID = 'refreshDataBrowser';
+	const REFRESH_BUTTON_ID = 'refreshDataBrowser';
 
 	/**
 	 * Timestamp for first day to be displayed
-	 * @var int
+	 * @var int [timestamp without any timezone]
 	 */
-	protected $timestamp_start;
+	protected $TimestampStart;
 
 	/**
 	 * Timestamp for last day to be displayed
-	 * @var int
+	 * @var int [timestamp without any timezone]
 	 */
-	protected $timestamp_end;
+	protected $TimestampEnd;
 
 	/**
 	 * Number of days to be displayed
 	 * @var int
 	 */
-	protected $day_count;
+	protected $DayCount;
 
 	/**
 	 * Days to be displayed
 	 * @var array
 	 */
-	protected $days;
+	protected $Days;
 
-	/**
-	 * Array containing IDs for 'short' sports
-	 * @var array
-	 */
-	protected $sports_short;
+	/** @var array sport ids that are explicitly set as 'only icon' */
+	protected $SportsShort = [];
 
-	/**
-	 * Internal DB object
-	 * @var DB
-	 */
+	/** @var array type ids that are explicitly set as 'only icon' */
+	protected $TypesShort = [];
+
+	/** @var array type ids that are explicitly set as 'complete row' */
+	protected $TypesNotShort = [];
+
+	/** @var int */
+	protected $AccountID;
+
+	/** @var \PDOforRunalyze */
 	protected $DB;
 
-	/**
-	 * Internal Error-object
-	 * @var Error
-	 */
-	protected $Error;
+	/** @var \Runalyze\Dataset\Configuration */
+	protected $DatasetConfig;
 
-	/**
-	 * Internal Dataset-object
-	 * @var Dataset
-	 */
-	protected $Dataset;
+	/** @var \Runalyze\Dataset\Query */
+	protected $DatasetQuery;
+
+	/** @var \Runalyze\Model\Factory */
+	protected $Factory;
 
 	/**
 	 * Number of additional columns
 	 * @var int
 	 */
-	protected $additionalColumns = 2;
+	protected $AdditionalColumns = 2;
 
 	/**
-	 * Boolean flag: show public link for trainings
+	 * Boolean flag: has current view no activities
 	 * @var boolean
 	 */
-	protected $showPublicLink = false;
+	protected $AllDaysEmpty = true;
 
 	/**
 	 * Default constructor
@@ -97,87 +102,89 @@ class DataBrowser {
 	 * Init pointer to DB/Error-object
 	 */
 	protected function initInternalObjects() {
-		$this->DB    = DB::getInstance();
-		$this->Error = Error::getInstance();
-		$this->Dataset = new Dataset();
+		$this->AccountID = SessionAccountHandler::getId();
+		$this->DB = DB::getInstance();
+		$this->DatasetConfig = new Dataset\Configuration($this->DB, $this->AccountID);
+		$this->DatasetQuery = new Dataset\Query($this->DatasetConfig, $this->DB, $this->AccountID);
+		$this->DatasetQuery->setAdditionalColumns(array('is_public'));
+		$this->Factory = new Factory($this->AccountID);
 	}
 
 	/**
 	 * Init private timestamps from request
 	 */
 	protected function initTimestamps() {
-		if (!isset($_GET['start']) || !isset($_GET['end'])) {
+		if (!isset($_GET['start']) || !isset($_GET['end']) || !is_numeric($_GET['start']) || !is_numeric($_GET['end'])) {
 			$Mode = Configuration::DataBrowser()->mode();
 
 			if ($Mode->showMonth()) {
-				$this->timestamp_start = mktime(0, 0, 0, date("m"), 1, date("Y"));
-				$this->timestamp_end   = mktime(23, 59, 50, date("m")+1, 0, date("Y"));
+				$this->TimestampStart = LocalTime::fromString('first day of this month 00:00:00')->getTimestamp();
+				$this->TimestampEnd   = LocalTime::fromString('last day of this month 23:59:59')->getTimestamp();
 			} else {
-				$this->timestamp_start = Time::Weekstart(time());
-				$this->timestamp_end   = Time::Weekend(time());
+				$this->TimestampStart = (new LocalTime)->weekstart();
+				$this->TimestampEnd   = (new LocalTime)->weekend();
 			}
 		} else {
-			$this->timestamp_start = $_GET['start'];
-			$this->timestamp_end   = $_GET['end'];
+			$this->TimestampStart = $_GET['start'];
+			$this->TimestampEnd   = $_GET['end'];
 		}
 
-		$this->day_count = round(($this->timestamp_end - $this->timestamp_start) / 86400);
+		$this->DayCount = round(($this->TimestampEnd - $this->TimestampStart) / 86400);
 	}
 
 	/**
-	 * Init all days for beeing displayed
+	 * Init all days for being displayed
 	 */
 	protected function initDays() {
-		$this->initShortSports();
+		$this->initShortModes();
 		$this->initEmptyDays();
 
-		$WhereNotPrivate = (FrontendShared::$IS_SHOWN && !Configuration::Privacy()->showPrivateActivitiesInList()) ? 'AND is_public=1' : '';
+		$Statement = $this->DatasetQuery->statementToFetchActivities($this->TimestampStart, $this->TimestampEnd);
 
-		$AllTrainings = $this->DB->query('
-			SELECT
-				id,
-				time,
-				`s` as `s_sum_with_distance`,
-				DATE(FROM_UNIXTIME(time)) as `date`
-				'.$this->Dataset->getQuerySelectForAllDatasets().'
-			FROM `'.PREFIX.'training`
-			WHERE `time` BETWEEN '.($this->timestamp_start-10).' AND '.($this->timestamp_end-10).'
-				'.$WhereNotPrivate.'
-			ORDER BY `time` ASC
-		')->fetchAll();
+		while ($Training = $Statement->fetch()) {
+			$w = Time::diffInDays($Training['time'], $this->TimestampStart);
 
-		foreach ($AllTrainings as $Training) {
-			$w = Time::diffInDays($Training['time'], $this->timestamp_start);
-
-			if (in_array($Training['sportid'], $this->sports_short))
-				$this->days[$w]['shorts'][]    = $Training;
-			else
-				$this->days[$w]['trainings'][] = $Training;
+			if (
+				in_array($Training['typeid'], $this->TypesShort) ||
+				(!in_array($Training['typeid'], $this->TypesNotShort) && in_array($Training['sportid'], $this->SportsShort))
+			) {
+				$this->Days[$w]['shorts'][]    = $Training;
+			} else {
+				$this->Days[$w]['trainings'][] = $Training;
+			}
+			$this->AllDaysEmpty = false;
 		}
+		if (\Runalyze\Configuration::DataBrowser()->reverseMode()) {
+		    $this->Days = array_reverse($this->Days);
+        }
 	}
 
 	/**
 	 * Init array with empty days
 	 */
 	protected function initEmptyDays() {
-		$this->days = array();
+		$this->Days = array();
+		$date = new LocalTime($this->TimestampStart);
+		$date->setTime(0, 0, 0);
 
-		for ($w = 0; $w <= ($this->day_count-1); $w++)
-			$this->days[] = array(
-				'date' => mktime(0, 0, 0, date("m",$this->timestamp_start), date("d",$this->timestamp_start)+$w, date("Y",$this->timestamp_start)),
+		for ($w = 0; $w <= ($this->DayCount-1); $w++) {
+			$this->Days[] = array(
+				'date' => $date->getTimestamp(),
 				'shorts' => array(),
-				'trainings' => array());
+				'trainings' => array()
+			);
+
+			$date->add(new \DateInterval('P1D'));
+		}
 	}
 
 	/**
 	 * Init $this->sports_short
 	 */
-	protected function initShortSports() {
-		$this->sports_short = array();
-		$sports = $this->DB->query('SELECT `id` FROM `'.PREFIX.'sport` WHERE `short`=1')->fetchAll();
-
-		foreach ($sports as $sport)
-			$this->sports_short[] = $sport['id'];
+	protected function initShortModes() {
+		$this->SportsShort = $this->DB->query('SELECT `id` FROM `'.PREFIX.'sport` WHERE `short`=1 AND accountid = '.$this->AccountID)->fetchAll(PDO::FETCH_COLUMN);
+		$this->TypesShort = $this->DB->query('SELECT `id` FROM `'.PREFIX.'type` WHERE `short`=1 AND accountid = '.$this->AccountID)->fetchAll(PDO::FETCH_COLUMN);
+		$this->TypesNotShort = $this->DB->query('SELECT `id` FROM `'.PREFIX.'type` WHERE `short`=0 AND accountid = '.$this->AccountID)->fetchAll(PDO::FETCH_COLUMN);
 	}
 
 	/**
@@ -194,17 +201,20 @@ class DataBrowser {
 		echo $this->getCalenderLink();
 		echo $this->getPrevLink();
 		echo $this->getNextLink();
+		echo $this->getCurrentLink();
 	}
 
 	/**
 	 * Display title
 	 */
 	protected function displayTitle() {
-		$timeForLinks = ($this->timestamp_start < time() && time() < $this->timestamp_end) ? time() : $this->timestamp_start;
+		$now = (new LocalTime)->getTimestamp();
+		$timestampForLinks = ($this->TimestampStart < $now && $now < $this->TimestampEnd) ? $now : $this->TimestampStart;
+		$timeForLinks = new LocalTime($timestampForLinks);
 
-		echo DataBrowserLinker::monthLink(Time::Month(date("m", $timeForLinks)), $timeForLinks).', ';
-		echo DataBrowserLinker::yearLink(date("Y", $timeForLinks), $timeForLinks).', ';
-		echo DataBrowserLinker::weekLink(date("W", $timeForLinks).'. '.__('week') , $timeForLinks);
+		echo DataBrowserLinker::monthLink(Time::month($timeForLinks->format('m')), $timestampForLinks).', ';
+		echo DataBrowserLinker::yearLink($timeForLinks->format('Y'), $timestampForLinks).', ';
+		echo DataBrowserLinker::weekLink(Configuration::General()->weekStart()->phpWeek($timestampForLinks, true).'. '.__('week') , $timestampForLinks);
 	}
 
 	/**
@@ -213,7 +223,6 @@ class DataBrowser {
 	protected function displayIconLinks() {
 		echo '<ul>';
 		echo '<li>'.$this->getSharedListLink().'</li>';
-		echo '<li>'.$this->getRefreshLink().'</li>';
 		echo '<li>'.$this->getMonthKmLink().'</li>';
 		echo '<li>'.$this->getWeekKmLink().'</li>';
 		echo '<li>'.$this->getNaviSearchLink().'</li>';
@@ -222,11 +231,26 @@ class DataBrowser {
 	}
 
 	/**
+	 * Display hover links
+	 */
+	protected function displayHoverLinks() {
+		echo $this->getConfigLink();
+		echo $this->getRefreshLink();
+	}
+
+	/**
+	 * Display config link
+	 */
+	protected function getConfigLink() {
+		echo Ajax::window('<a class="tab" href="settings/dataset">'.Icon::$CONF.'</a>');
+	}
+
+	/**
 	 * Get link to navigation back
 	 * @return string
 	 */
 	protected function getPrevLink() {
-		$timestamp_array = DataBrowserLinker::prevTimestamps($this->timestamp_start, $this->timestamp_end);
+		$timestamp_array = DataBrowserLinker::prevTimestamps($this->TimestampStart, $this->TimestampEnd);
 
 		return DataBrowserLinker::link(Icon::$BACK, $timestamp_array['start'], $timestamp_array['end'], __('back'));
 	}
@@ -236,9 +260,17 @@ class DataBrowser {
 	 * @return string
 	 */
 	protected function getNextLink() {
-		$timestamp_array = DataBrowserLinker::nextTimestamps($this->timestamp_start, $this->timestamp_end);
+		$timestamp_array = DataBrowserLinker::nextTimestamps($this->TimestampStart, $this->TimestampEnd);
 
 		return DataBrowserLinker::link(Icon::$NEXT, $timestamp_array['start'], $timestamp_array['end'], __('next'));
+	}
+
+	/**
+	 * Get link to jump to today
+	 * @return string
+	 */
+	protected function getCurrentLink() {
+		return DataBrowserLinker::link('<i class="fa fa-fw fa-circle"></i>', '', '', __('today'));
 	}
 
 	/**
@@ -246,9 +278,9 @@ class DataBrowser {
 	 * @return string
 	 */
 	protected function getRefreshLink() {
-		$Link = DataBrowserLinker::link(Icon::$REFRESH, $this->timestamp_start, $this->timestamp_end);
+		$Link = DataBrowserLinker::link(Icon::$REFRESH, $this->TimestampStart, $this->TimestampEnd);
 
-		return str_replace('<a ', '<a id="'.self::$REFRESH_BUTTON_ID.'" '.Ajax::tooltip('', __('Reload current datasheet'), false, true), $Link);
+		return str_replace('<a ', '<a id="'.self::REFRESH_BUTTON_ID.'" '.Ajax::tooltip('', __('Reload current datasheet'), false, true), $Link);
 	}
 
 	/**
@@ -277,7 +309,7 @@ class DataBrowser {
 
 	/**
 	 * Get list to shared list
-	 * @returns tring
+	 * @returns string
 	 */
 	protected function getSharedListLink() {
 		return SharedLinker::getListLinkForCurrentUser();
@@ -297,5 +329,37 @@ class DataBrowser {
 	 */
 	protected function getAddLink() {
 		return ImporterWindow::link();
+	}
+
+	/**
+	 * Get date string for given timestamp
+	 * @param int $timestampInNoTimezone
+	 * @return string
+	 */
+	protected function dateString($timestampInNoTimezone) {
+		$localTime = new LocalTime($timestampInNoTimezone);
+		$addLink = '';
+		$weekDay = Time::weekday($localTime->format('w'), true);
+
+		if (Configuration::DataBrowser()->showCreateLink() && !FrontendShared::$IS_SHOWN) {
+			$addLink = ImporterWindow::linkForDate($localTime->toServerTimestamp());
+		}
+
+		if ($localTime->isToday()) {
+			$weekDay = '<strong>'.$weekDay.'</strong>';
+		}
+
+		return $localTime->format('d.m.').' '.$addLink.' '.$weekDay;
+	}
+
+	/**
+	 * Additional columns that are shown next to date columns
+	 * @param \Runalyze\View\Dataset\Table $table
+	 * @param \Runalyze\Dataset\Context $context
+	 * @return string html string that must contain `$this->AdditionalColumns - 2` columns
+	 */
+	protected function codeForAdditionalColumnsForActivity(View\Dataset\Table $table, Dataset\Context $context)
+	{
+		return '';
 	}
 }

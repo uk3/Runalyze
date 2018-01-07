@@ -13,17 +13,13 @@
 @panel-hover-icons-color-hover:	#000;
 
 @loading-min-height:			50px;
-@loading-background-image:		url(../../img/wait.gif);
+@loading-background-image:		url(../../web/assets/v2.x/img/wait.gif);
 @loading-background-color:		@panel-background;
 
 @databox-border:				#ccc;
 @databox-background:			#f6f6f6;
 @databox-margin:				5px;
 @databox-padding:				3px;
-
-@error-toolbar-width:			800px;
-@error-toolbar-background:		#efefef;
-@error-toolbar-border:			#ccc;
 
 @nav-submenu-hover:				#f7f7f9;
 
@@ -33,6 +29,28 @@
 	margin: @panel-margin;
 	background: @panel-background;
 	border: 1px solid @panel-border;
+}
+
+.panel-heading,
+.panel-content {
+	h1 {
+		padding: @panel-padding;
+		margin: 0;
+		font-size: @panel-heading-font-size;
+		text-transform: uppercase;
+		color: @panel-heading-color;
+		border: none;
+	}
+
+	h2 {
+		padding: @panel-padding;
+		margin: 0;
+		font-size: @panel-heading-font-size;
+		font-weight: bold;
+		text-transform: none;
+		letter-spacing: 1px;
+		border: none;
+	}
 }
 
 .panel-heading {
@@ -51,24 +69,10 @@
 		border-bottom: none;
 	}
 
-	h1 {
+	h1, h2 {
 		display: inline;
 		padding: 0;
 		margin: 0;
-		font-size: @panel-heading-font-size;
-		text-transform: uppercase;
-		color: @panel-heading-color;
-		border: none;
-	}
-
-	h2 {
-		padding: 0;
-		margin: 0;
-		font-size: @panel-heading-font-size;
-		font-weight: bold;
-		text-transform: none;
-		letter-spacing: 1px;
-		border: none;
 	}
 
 	.hover-icons {
@@ -123,6 +127,48 @@
 	}
 }
 
+.headline-menu,
+.panel-menu .with-submenu {
+	position: relative;
+
+	&:hover .submenu {
+		display: block;
+	}
+}
+
+.panel-menu,
+.headline-menu {
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style-type: none;
+	}
+
+	.submenu {
+		z-index: @z-index-menu;
+		display: none;
+		position: absolute;
+		min-width: 100%;
+		white-space: nowrap;
+
+		li {
+			margin: 0;
+			padding: 0;
+			text-shadow: none;
+			float: none;
+			display: block;
+			overflow: hidden;
+			width: 100%;
+
+			a, .link, .no-link {
+				display: block;
+				padding: @panel-padding (1.5*@panel-padding);
+				margin: 0;
+			}
+		}
+	}
+}
+
 .panel-menu {
 	float: right;
 	margin-left: @panel-icons-margin;
@@ -164,10 +210,6 @@
 	}
 
 	ul {
-		margin: 0;
-		padding: 0;
-		list-style-type: none;
-
 		li {
 			position: relative;
 			display: inline-block;
@@ -189,7 +231,46 @@
 					font-family: FontAwesome;
 				}
 			}
+		}
 
+		.submenu {
+			border-top: 1px solid @panel-heading-border;
+			border-right: 1px solid @panel-heading-border;
+			background-color: @panel-background;
+		}
+	}
+}
+
+.inline-menu {
+	color: #666;
+	font-weight: normal;
+
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style-type: none;
+
+		li {
+			margin: 0;
+			padding: 0;
+			position: relative;
+			display: inline-block;
+		}
+
+		.with-submenu {
+			> .link {
+				display: block;
+				white-space: nowrap;
+
+				&:after {
+					content: ' \f107';
+					font-family: FontAwesome;
+				}
+			}
+
+			&:hover > .link {
+				color: @panel-nav-active-color;
+			}
 			&:hover .submenu {
 				display: block;
 			}
@@ -198,26 +279,23 @@
 		.submenu {
 			z-index: @z-index-menu;
 			display: none;
-			min-width: 100px;
 			position: absolute;
-			min-width: 100%;
-			border-top: 1px solid @panel-heading-border;
-			border-right: 1px solid @panel-heading-border;
+			white-space: nowrap;
+			border: 1px solid @panel-heading-border;
 			background-color: @panel-background;
 
 			li {
-				margin: 0;
-				padding: 0;
-				text-shadow: none;
-				float: none;
 				display: block;
 				overflow: hidden;
 				width: 100%;
+			}
 
-				a, span.link {
-					display: block;
-					padding: @panel-padding (1.5*@panel-padding);
-					margin: 0;
+			a, span.link {
+				display: block;
+				padding: @panel-padding (1.5*@panel-padding);
+
+				&:hover {
+					background-color: @nav-submenu-hover;
 				}
 			}
 		}
@@ -260,19 +338,20 @@
 
 	* {
 		opacity: 0;
-		transition: opacity 0.4s linear;
+		visibility: hidden;
+		transition: visibility 0s 0.4s, opacity 0.4s linear;
 	}
 }
 
 .wait-img {
-	background: url(../../img/wait.gif) center center no-repeat !important;
+	background: @loading-background-image center center no-repeat !important;
 }
 
 #data-browser-container table {
 	width: 100%;
 }
 
-#data-browser, statistics-containerr {
+#data-browser, .statistics-container {
 	overflow: auto;
 }
 
@@ -401,21 +480,6 @@
 		&.triggered {
 			opacity: 1;
 		}
-	}
-}
-
-#error-toolbar {
-	z-index: @z-index-error-toolbar;
-	position: fixed;
-	bottom: 0;
-	left: 50%;
-	width: @error-toolbar-width;
-	margin-left: -(@error-toolbar-width/2);
-	background-color: @error-toolbar-background;
-	max-height: (@error-toolbar-width/2);
-
-	tr {
-		border-bottom: 1px solid @error-toolbar-border;
 	}
 }
 

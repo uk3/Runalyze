@@ -5,16 +5,19 @@
  * @package Runalyze\Plugins\Panels
  */
 
+use Runalyze\Activity\Weight;
+
+$Weight = new Weight();
 $Factory = new PluginFactory();
 $Plugin = $Factory->newInstance('RunalyzePluginPanel_Sportler');
 $Wunschgewicht = $Plugin->Configuration()->value('wunschgewicht');
 
 if ($Plugin->Configuration()->value('plot_timerange') > 0)
-	$QueryEnd = 'WHERE `time` > '.(time() - DAY_IN_S * (int)$Plugin->Configuration()->value('plot_timerange')).' ORDER BY `time` DESC';
+	$QueryEnd = 'WHERE `time` > '.(time() - DAY_IN_S * (int)$Plugin->Configuration()->value('plot_timerange')).' AND `accountid` = '.SessionAccountHandler::getId().' ORDER BY `time` DESC';
 else
-	$QueryEnd = 'ORDER BY `time` DESC LIMIT '.((int)$Plugin->Configuration()->value('plot_points'));
+	$QueryEnd = 'WHERE `accountid` = '.SessionAccountHandler::getId().' ORDER BY `time` DESC LIMIT '.((int)$Plugin->Configuration()->value('plot_points'));
 
-$Data     = array_reverse( DB::getInstance()->query('SELECT weight,pulse_rest,time FROM `'.PREFIX.'user` '.$QueryEnd)->fetchAll() );
+$Data     = array_reverse( DB::getInstance()->query('SELECT weight,pulse_rest,time FROM `'.PREFIX.'user`'.' '.$QueryEnd)->fetchAll() );
 $Weights  = array();
 $HRrests  = array();
 
@@ -23,7 +26,7 @@ if (count($Data) == 1)
 
 if (!empty($Data)) {
 	foreach ($Data as $D) {
-		$Weights[$D['time'].'000'] = (double)$D['weight'];
+		$Weights[$D['time'].'000'] = $Weight->set($D['weight'])->valueInPreferredUnit();
 		$HRrests[$D['time'].'000'] = (int)$D['pulse_rest'];
 	}
 }
@@ -34,9 +37,7 @@ foreach ($Labels as $i => &$value)
 		$value = '';
 
 $Plot = new Plot("sportler_weights", 320, 150);
-if ($Plugin->Configuration()->value('use_weight'))
 	$Plot->Data[] = array('label' => __('Weight'), 'color' => '#008', 'data' => $Weights);
-if ($Plugin->Configuration()->value('use_pulse'))
 	$Plot->Data[] = array('label' => __('Resting HR'), 'color' => '#800', 'data' => $HRrests, 'yaxis' => 2);
 
 $Plot->setMarginForGrid(5);
@@ -45,11 +46,11 @@ $Plot->setXLabels($Labels);
 $Plot->setXAxisTimeFormat('%m/%y');
 $Plot->setXAxisMaxToToday();
 $Plot->Options['xaxis']['labelWidth'] = 50;
-//$Plot->Options['xaxis']['tickLength'] = 3;
-$Plot->Options['series']['curvedLines']['fit'] = true;
+$Plot->Options['series']['curvedLines']['monotonicFit'] = true;
+$Plot->PlotOptions['allowSelection'] = false;
 
 $Plot->addYAxis(1, 'left');
-$Plot->addYUnit(1, 'kg', 1);
+$Plot->addYUnit(1, $Weight->unit(), 1);
 $Plot->setYTicks(1, 2, 0);
 $Plot->addYAxis(2, 'right', false);
 $Plot->addYUnit(2, 'bpm', 0);

@@ -4,17 +4,16 @@
  * Call:   include 'Plot.gewicht.php'
  * @package Runalyze\Plugins\Panels
  */
-
 $Factory = new PluginFactory();
 $Plugin = $Factory->newInstance('RunalyzePluginPanel_Sportler');
 
 if ($Plugin->Configuration()->value('plot_timerange') > 0) {
-	$QueryEnd = 'WHERE `time` > '.(time() - DAY_IN_S * (int)$Plugin->Configuration()->value('plot_timerange')).' ORDER BY `time` DESC';
+	$QueryEnd = 'WHERE `time` > '.(time() - DAY_IN_S * (int)$Plugin->Configuration()->value('plot_timerange')).' AND `accountid` = '.SessionAccountHandler::getId().' ORDER BY `time` DESC';
 } else {
-	$QueryEnd = 'ORDER BY `time` DESC LIMIT '.((int)$Plugin->Configuration()->value('plot_points'));
+	$QueryEnd = 'WHERE `accountid` = '.SessionAccountHandler::getId().' ORDER BY `time` DESC LIMIT '.((int)$Plugin->Configuration()->value('plot_points'));
 }
 
-$Data     = array_reverse( DB::getInstance()->query('SELECT fat,water,muscles,time FROM `'.PREFIX.'user` '.$QueryEnd)->fetchAll() );
+$Data     = array_reverse( DB::getInstance()->query('SELECT fat,water,muscles,time FROM `'.PREFIX.'user` '.$QueryEnd)->fetchAll());
 $Adiposes = array();
 $Water    = array();
 $Muscles  = array();
@@ -29,7 +28,7 @@ if (!empty($Data)) {
 		$Water[$D['time'].'000']    = $D['water'];
 		$Muscles[$D['time'].'000']  = $D['muscles'];
 	}
-} 
+}
 
 $Labels = array_keys($Water);
 foreach ($Labels as $i => &$value) {
@@ -46,14 +45,13 @@ $Plot->Data[] = array('label' => __('Muscles'), 'color' => '#080', 'data' => $Mu
 
 $Plot->setMarginForGrid(5);
 
-//$Plot->hideXLabels();
 $Plot->setXLabels($Labels);
 $Plot->setXAxisTimeFormat('%m/%y');
 $Plot->setXAxisMaxToToday();
 $Plot->Options['xaxis']['labelWidth'] = 50;
-//$Plot->Options['xaxis']['tickLength'] = 3;
 $Plot->Options['yaxis']['autoscaleMargin'] = 0.1;
-$Plot->Options['series']['curvedLines']['fit'] = true;
+$Plot->Options['series']['curvedLines']['monotonicFit'] = true;
+$Plot->PlotOptions['allowSelection'] = false;
 
 $Plot->addYAxis(1, 'left');
 $Plot->addYUnit(1, '%', 0);

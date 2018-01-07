@@ -1,8 +1,8 @@
 # fittorunalyze
 # (c) hannes@runalyze.de, 2014
-# 
+#
 # This code uses the Garmin::FIT package to extract selected fields from one FIT file
-# Based on 'fitdump' by Kiyokazu SUTO
+# Based on 'fitdump' (v0.05) by Kiyokazu SUTO
 #
 # Output:
 # - All "info" messages start with a '#'
@@ -23,7 +23,13 @@ use Garmin::FIT;
 
 # DUMP MESSAGE
 sub dump_it {
-  my ($self, $desc, $v) = @_;
+  my ($self, $desc, $v, $o_cbmap) = @_;
+
+  if ($desc->{message_name} ne '') {
+    my $o_cb = $o_cbmap->{$desc->{message_name}};
+
+    ref $o_cb eq 'ARRAY' and ref $o_cb->[0] eq 'CODE' and $o_cb->[0]->($self, $desc, $v, @$o_cb[1 .. $#$o_cb]);
+  }
 
   print "= TYPE=$desc->{local_message_type} ";
   print 'NAME=', $desc->{message_name}, ' ' if $desc->{message_name};
@@ -34,6 +40,7 @@ sub dump_it {
 
   # CONFIGURATION
   $indent = '--- ';
+  $skip_arrays = 0;
   $skip_invalid = 1;
   $skip_debug = 1;
 
@@ -84,6 +91,15 @@ sub dump_it {
 
         $FH->print($v->[$i], '=', $pval);
 
+    if (!$skip_arrays && $c > 1) {
+		  my ($j, $k);
+
+	  	  for ($j = $i + 1, $k = $i + $c ; $j < $k ; ++$j) {
+  	    	$pval = $self->value_cooked($tname, $attr, $invalid, $v->[$j]);
+  	    	$FH->print(',', $pval);
+	  	  }
+    }
+
 		# Additional stuff I don't understand ...
 		if (!$skip_debug) {
 	        $FH->print(' # ');
@@ -126,7 +142,15 @@ sub fetch_from {
   $obj->mps_to_kph(1);
   $obj->use_gmtime(1);
   $obj->file($fn);
-  $obj->data_message_callback_by_name('', \&dump_it);
+
+  my $o_cbmap = $obj->data_message_callback_by_name('');
+  my $msgname;
+
+  foreach $msgname (keys %$o_cbmap) {
+    $obj->data_message_callback_by_name($msgname, \&dump_it, $o_cbmap);
+  }
+
+  $obj->data_message_callback_by_name('', \&dump_it, $o_cbmap);
 
   unless ($obj->open) {
     print STDERR $obj->error, "\n";
@@ -150,7 +174,7 @@ sub fetch_from {
   printf "# File size: %lu, protocol version: %u.%02u, profile_version: %u.%02u\n", $fsize, $proto_major, $proto_minor, $prof_major, $prof_minor;
 
   if ($h_extra ne '') {
-    print "# Extra octets in file header:";
+    print "# Hex dump of extra octets in the file header:";
 
     my ($i, $n);
 
@@ -174,7 +198,7 @@ sub fetch_from {
 
   my $garbage_size = $obj->trailing_garbages;
 
-  print "# Trainling $garbage_size octets garbages skipped\n" if $garbage_size > 0;
+  print "# Trailing $garbage_size octets garbages skipped\n" if $garbage_size > 0;
   $obj->close;
 }
 

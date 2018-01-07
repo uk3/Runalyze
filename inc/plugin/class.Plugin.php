@@ -5,6 +5,7 @@
  */
 
 use Runalyze\Configuration;
+use Runalyze\Error;
 
 /**
  * Abstract class for Plugins
@@ -46,7 +47,7 @@ abstract class Plugin {
 	 * Url for displaying the plugin
 	 * @var string
 	 */
-	public static $DISPLAY_URL = 'call/call.Plugin.display.php';
+	public static $DISPLAY_URL = 'my/plugin';
 
 	/**
 	 * CSS-Flag for plugins: Don't reload if config has changed
@@ -91,14 +92,14 @@ abstract class Plugin {
 	protected $sportid;
 
 	/**
-	 * Displayed year
+	 * Displayed year (-1: 'all', 6/12: 'last 6/12 months')
 	 * @var int
 	 */
 	protected $year;
 
 	/**
 	 * Internal data from database
-	 * @var array
+	 * @var string
 	 */
 	protected $dat;
 
@@ -131,7 +132,7 @@ abstract class Plugin {
 
 	/**
 	 * Init configuration
-	 * 
+	 *
 	 * May be used in subclass to set own configuration.
 	 * Make sure to add all values to the configuration object
 	 * before using <code>$this->setConfiguration($Configuration);</code>.
@@ -146,13 +147,13 @@ abstract class Plugin {
 	 * Set configuration
 	 * @param PluginConfiguration $Configuration
 	 */
-	protected function setConfiguration(PluginConfiguration &$Configuration) {
+	protected function setConfiguration(PluginConfiguration $Configuration) {
 		$this->Configuration = $Configuration;
 	}
 
 	/**
 	 * Configuration
-	 * 
+	 *
 	 * This method call will force the configuration object to catch its values
 	 * from the database if not already done.
 	 * @return PluginConfiguration
@@ -274,7 +275,7 @@ abstract class Plugin {
 	abstract protected function getInnerLink($name, $sport = 0, $year = 0, $dat = '');
 
 	/**
-	 * Display description, can be overwritten for displaying a longer description 
+	 * Display description, can be overwritten for displaying a longer description
 	 */
 	protected function displayLongDescription() {
 		echo HTML::p($this->description());
@@ -286,7 +287,6 @@ abstract class Plugin {
 	 */
 	final public function install() {
 		if ($this->id() != PluginInstaller::ID) {
-			Error::getInstance()->addError('Plugin can not be installed, id is set wrong.');
 			return false;
 		}
 
@@ -305,18 +305,6 @@ abstract class Plugin {
 		return true;
 	}
 
-         /**
-         * Cache all from Table plugin for a user
-         */
-        static private function cachePluginData() {
-            $data = Cache::get('plugins');
-            if(is_null($data)) {
-                $data = DB::getInstance()->query('SELECT * FROM `'.PREFIX.'plugin`')->fetchAll();
-                Cache::set('plugins', $data, '3600');
-            }
-            return $data;
-        }       
-        
 	/**
 	 * Initialize all variables
 	 */
@@ -325,18 +313,13 @@ abstract class Plugin {
 			return;
 		}
 
-                $plugindata = self::cachePluginData();
-                foreach($plugindata as $plugin) {
-                    if($plugin['id'] == $this->id())
-                        $dat = $plugin;
-                }
-
-		$this->key         = $dat['key'];
-		$this->active      = $dat['active'];
-		$this->order       = $dat['order'];
-		$this->sportid     = $this->defaultSport();
-		$this->year        = $this->defaultYear();
-		$this->dat         = '';
+        $data = PluginFactory::dataFor($this->id());
+		$this->key     = $data['key'];
+		$this->active  = $data['active'];
+		$this->order   = $data['order'];
+		$this->sportid = $this->defaultSport();
+		$this->year    = $this->defaultYear();
+		$this->dat     = '';
 
 		if (isset($_GET['sport']))
 			if (is_numeric($_GET['sport']))
@@ -349,11 +332,46 @@ abstract class Plugin {
 	}
 
 	/**
+	 * @return boolean
+	 */
+	final protected function showsAllYears() {
+		return ($this->year == -1);
+	}
+
+	/**
+	 * @return boolean
+	 */
+	final protected function showsSpecificYear() {
+		return ($this->year != -1 && $this->year != 6 && $this->year != 12);
+	}
+
+	/**
+	 * @return boolean
+	 */
+	final protected function showsTimeRange() {
+		return ($this->year == 6) || ($this->year == 12);
+	}
+
+	/**
+	 * @return boolean
+	 */
+	final protected function showsLast6Months() {
+		return ($this->year == 6);
+	}
+
+	/**
+	 * @return boolean
+	 */
+	final protected function showsLast12Months() {
+		return ($this->year == 12);
+	}
+
+	/**
 	 * Default sport
-	 * 
+	 *
 	 * May be overwritten in subclass.
 	 * Default setting: Configuration::General()->mainSport()
-	 * 
+	 *
 	 * @return int sportid, can be -1 for all sports
 	 */
 	protected function defaultSport() {
@@ -362,10 +380,10 @@ abstract class Plugin {
 
 	/**
 	 * Default year
-	 * 
+	 *
 	 * May be overwritten in subclass.
 	 * Default setting: current year
-	 * 
+	 *
 	 * @return int year, can be -1 for no year/comparison of all years
 	 */
 	protected function defaultYear() {
@@ -378,14 +396,6 @@ abstract class Plugin {
 	 */
 	protected function titleForAllYears() {
 		return __('Year on year');
-	}
-
-	/**
-	 * Get config
-	 * @return array
-	 */
-	final public function getConfig() {
-		return $this->config;
 	}
 
 	/**
@@ -417,8 +427,8 @@ abstract class Plugin {
 		if (isset($_GET['active'])) {
 			$this->setActive((int) $_GET['active']);
 
-			Ajax::setReloadFlag(Ajax::$RELOAD_PLUGINS);
-			echo Ajax::getReloadCommand();
+            Ajax::setReloadFlag(Ajax::$RELOAD_ALL);
+            echo Ajax::getReloadCommand();
 		}
 	}
 
@@ -439,5 +449,7 @@ abstract class Plugin {
 	final public function setActive($active = 1) {
 		DB::getInstance()->update('plugin', $this->id(), 'active', $active);
 		$this->active = $active;
+
+		PluginFactory::clearCache();
 	}
 }

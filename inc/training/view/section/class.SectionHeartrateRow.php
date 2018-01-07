@@ -3,9 +3,12 @@
  * This file contains class::SectionHeartrateRow
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\View\Activity;
+use Runalyze\View\Activity\Box;
 /**
  * Row: Heartrate
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -14,10 +17,13 @@ class SectionHeartrateRow extends TrainingViewSectionRowTabbedPlot {
 	 * Set plot
 	 */
 	protected function setRightContent() {
-		$this->addRightContent('plot', __('Heartrate plot'), new TrainingPlotPulse($this->Training));
+		$this->addRightContent('plot', __('Heartrate plot'), new Activity\Plot\Heartrate($this->Context));
 
-		if ($this->Training->hasArrayHeartrate()) {
-			$Table = new TableZonesHeartrate($this->Training);
+		if (
+			$this->Context->trackdata()->has(\Runalyze\Model\Trackdata\Entity::HEARTRATE) &&
+			$this->Context->trackdata()->has(\Runalyze\Model\Trackdata\Entity::TIME)
+		) {
+			$Table = new TableZonesHeartrate($this->Context);
 			$Code = $Table->getCode();
 			$Code .= HTML::info( __('You\'ll be soon able to configure your own zones.') );
 
@@ -32,6 +38,7 @@ class SectionHeartrateRow extends TrainingViewSectionRowTabbedPlot {
 		$this->addAverageHeartrate();
 		$this->addMaximalHeartrate();
 		$this->addCaloriesAndTrimp();
+		$this->addFitTrainingEffect();
 
 		foreach ($this->BoxedValues as &$Value)
 			$Value->defineAsFloatingBlock('w50');
@@ -41,9 +48,12 @@ class SectionHeartrateRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: average heartrate
 	 */
 	protected function addAverageHeartrate() {
-		if ($this->Training->getPulseAvg() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getPulseAvg(), 'bpm', __('&oslash; Heartrate'));
-			$this->BoxedValues[] = new BoxedValue(Running::PulseInPercent($this->Training->getPulseAvg()), '&#37;', __('&oslash; Heartrate'));
+		if ($this->Context->activity()->hrAvg() > 0) {
+			$this->BoxedValues[] = new BoxedValue($this->Context->dataview()->hrAvg()->inBPM(), 'bpm', __('avg.').' '.__('Heart rate'));
+
+			if ($this->Context->dataview()->hrMax()->canShowInHRmax()) {
+				$this->BoxedValues[] = new BoxedValue($this->Context->dataview()->hrAvg()->inPercent(), '&#37;', __('avg.').' '.__('Heart rate'));
+			}
 		}
 	}
 
@@ -51,9 +61,12 @@ class SectionHeartrateRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: average heartrate
 	 */
 	protected function addMaximalHeartrate() {
-		if ($this->Training->getPulseMax() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getPulseMax(), 'bpm', __('max. Heartrate'));
-			$this->BoxedValues[] = new BoxedValue(Running::PulseInPercent($this->Training->getPulseMax()), '&#37;', __('max. Heartrate'));
+		if ($this->Context->activity()->hrMax() > 0) {
+			$this->BoxedValues[] = new Box\MaximalHeartRateInBPM($this->Context->dataview()->hrMax());
+
+			if ($this->Context->dataview()->hrMax()->canShowInHRmax()) {
+				$this->BoxedValues[] = new Box\MaximalHeartRateInPercent($this->Context->dataview()->hrMax(), !Request::isOnSharedPage());
+			}
 		}
 	}
 
@@ -61,9 +74,18 @@ class SectionHeartrateRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: calories/trimp
 	 */
 	protected function addCaloriesAndTrimp() {
-		if ($this->Training->getCalories() > 0 || $this->Training->getTrimp() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getCalories(), 'kcal', __('Calories'));
-			$this->BoxedValues[] = new BoxedValue($this->Training->getTrimp(), '', __('TRIMP'));
+		if ($this->Context->activity()->energy() > 0 || $this->Context->activity()->trimp() > 0) {
+			$this->BoxedValues[] = new Box\Energy($this->Context);
+			$this->BoxedValues[] = new Box\Trimp($this->Context);
 		}
+	}
+
+	/**
+	 * Add: FitTrainingEffect
+	 */
+	protected function addFitTrainingEffect() {
+	    if ($this->Context->activity()->fitTrainingEffect() > 0) {
+		$this->BoxedValues[] = new Box\FitTrainingEffect($this->Context);
+	    }
 	}
 }

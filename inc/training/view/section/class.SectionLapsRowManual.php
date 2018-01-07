@@ -3,9 +3,14 @@
  * This file contains class::SectionLapsRowManual
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\Model\Trackdata;
+use Runalyze\View\Activity;
+use Runalyze\View\Activity\Linker;
+
 /**
  * Row: Laps (manual)
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -14,7 +19,7 @@ class SectionLapsRowManual extends TrainingViewSectionRow {
 	 * Set plot
 	 */
 	protected function setPlot() {
-		$this->Plot = new TrainingPlotLapsManual($this->Training);
+		$this->Plot = new Activity\Plot\LapsManual($this->Context);
 	}
 
 	/**
@@ -22,30 +27,29 @@ class SectionLapsRowManual extends TrainingViewSectionRow {
 	 */
 	protected function setContent() {
 		$this->withShadow = true;
-
-		$this->addTable();
-
 		$this->addInfoLink();
+		$this->addTable();
 	}
 
 	/**
 	 * Add: table
 	 */
 	protected function addTable() {
-		if (!$this->Training->Splits()->areEmpty() && $this->Training->Splits()->totalDistance() > 0) {
-			$Table = new TableLaps($this->Training);
-			$this->Code = $Table->getCode();
-		}
+		$Table = new TableLaps($this->Context);
+		$this->Code = $Table->getCode();
 	}
 
 	/**
 	 * Add info link
 	 */
 	protected function addInfoLink() {
-		if ($this->Training->hasArrayPace()) {
-			$InfoLink = Ajax::window('<a href="'.$this->Training->Linker()->urlToRoundsInfo().'">'.__('More details about your laps').'</a>', 'normal');
+		if ($this->Context->trackdata()->has(Trackdata\Entity::DISTANCE) && $this->Context->trackdata()->has(Trackdata\Entity::TIME)) {
+			if (!Request::isOnSharedPage()) {
+				$Linker = new Linker($this->Context->activity());
+				$InfoLink = Ajax::window('<a href="'.$Linker->urlToRoundsInfo().'">'.__('More details about your laps').'</a>', 'big');
 
-			$this->Content = HTML::info( $InfoLink );
+				$this->Header = HTML::info( $InfoLink );
+			}
 		}
 	}
 }

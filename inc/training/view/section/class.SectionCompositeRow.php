@@ -5,30 +5,55 @@
  */
 
 use Runalyze\Configuration;
+use Runalyze\View\Activity;
+use Runalyze\View\Activity\Box;
+use Runalyze\View\Leaflet;
 
 /**
  * Row: Heartrate
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
 class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	/**
+	 * Add map
+	 */
+    protected function addMap() {
+        if ($this->Context->hasRoute() && $this->Context->route()->hasPositionData() && !$this->Context->hideMap()) {
+            $Map = new Leaflet\Map('map-'.$this->Context->activity()->id());
+            $Map->addRoute(
+                new Leaflet\Activity(
+                    'route-'.$this->Context->activity()->id(),
+                    $this->Context->route(),
+                    $this->Context->trackdata()
+                )
+            );
+
+            $this->TopContent = '<div id="training-map"">'.$Map->code().'</div>';
+            $this->big = true;
+        }
+    }
+
+	/**
 	 * Set plot
 	 */
 	protected function setRightContent() {
+        if (Configuration::ActivityView()->plotMode()->showCollection() && Configuration::ActivityView()->mapFirst())
+            $this->addMap();
+
 		$this->addRightContent('plot', __('Composite plot'), $this->getPlot());
 
-		if ($this->Training->hasArrayPace()) {
-			$Table = new TableZonesPace($this->Training);
+		if ($this->Context->trackdata()->has(\Runalyze\Model\Trackdata\Entity::PACE)) {
+			$Table = new TableZonesPace($this->Context);
 			$Code = $Table->getCode();
 			$Code .= HTML::info( __('You will be soon able to configure your own zones.') );
 
 			$this->addRightContent('zones-pace', __('Pace zones'), $Code);
 		}
 
-		if ($this->Training->hasArrayHeartrate()) {
-			$Table = new TableZonesHeartrate($this->Training);
+		if ($this->Context->trackdata()->has(\Runalyze\Model\Trackdata\Entity::HEARTRATE)) {
+			$Table = new TableZonesHeartrate($this->Context);
 			$Code = $Table->getCode();
 			$Code .= HTML::info( __('You will be soon able to configure your own zones.') );
 
@@ -38,14 +63,14 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 
 	/**
 	 * Get plot
-	 * @return \TrainingPlotCollection|\TrainingPlotPacePulse
+	 * @return \Runalyze\View\Activity\Plot\ActivityPlot
 	 */
 	protected function getPlot() {
 		if (Configuration::ActivityView()->plotMode()->showCollection()) {
-			return new TrainingPlotCollection($this->Training);
+			return new Activity\Plot\PaceAndHeartrateAndElevation($this->Context);
 		}
 
-		return new TrainingPlotPacePulse($this->Training);
+		return new Activity\Plot\PaceAndHeartrate($this->Context);
 	}
 
 	/**
@@ -53,6 +78,11 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 */
 	protected function setContent() {
 		$showElevation = Configuration::ActivityView()->plotMode()->showCollection();
+
+        if (Configuration::ActivityView()->plotMode()->showCollection() && Configuration::ActivityView()->mapFirst()) {
+            $this->BoxedValues[] = new Box\Distance($this->Context);
+            $this->BoxedValues[] = new BoxedValue($this->Context->dataview()->duration()->string(), '', __('Time'));
+        }
 
 		$this->addAveragePace();
 		$this->addCalculations();
@@ -65,6 +95,10 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 			$this->addElevation();
 		}
 
+		if (Configuration::ActivityView()->plotMode()->showCollection() && Configuration::ActivityView()->mapFirst()) {
+			$this->BoxedValues[] = new BoxedValue($this->Context->dataview()->elapsedTime(), '', __('Elapsed time'));
+		}
+
 		foreach ($this->BoxedValues as &$Value) {
 			$Value->defineAsFloatingBlock('w50');
 		}
@@ -73,11 +107,9 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 			$this->addCourse();
 		}
 
-		if ($this->Training->getCurrentlyUsedVdot() > 0) {
-			$this->addVdotInfoLink();
-		}
+		$this->addVO2maxInfoLink();
 
-		if ($showElevation && $this->Training->hasArrayAltitude()) {
+		if ($showElevation && $this->Context->hasRoute() && $this->Context->route()->hasElevations()) {
 			$this->addElevationInfoLink();
 		}
 	}
@@ -86,38 +118,50 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: average pace
 	 */
 	protected function addAveragePace() {
-		if ($this->Training->getDistance() > 0 && $this->Training->getTimeInSeconds() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getPace(), '/km', __('&oslash; Pace'));
-			$this->BoxedValues[] = new BoxedValue($this->Training->DataView()->getKmh(), 'km/h', __('&oslash; Speed'));
+		if ($this->Context->activity()->distance() > 0 && $this->Context->activity()->duration() > 0) {
+			$Pace = $this->Context->dataview()->pace();
+
+			if ($Pace->unit()->isDecimalFormat()) {
+				$this->BoxedValues[] = new Activity\Box\Pace($this->Context);
+				$this->BoxedValues[] = new Activity\Box\PaceAlternative($this->Context);
+			} else {
+				$this->BoxedValues[] = new Activity\Box\Pace($this->Context);
+				$this->BoxedValues[] = new Activity\Box\Speed($this->Context);
+			}
 		}
 	}
 
 	/**
-	 * Add: vdot/intensity
+	 * Add: vo2max
 	 */
 	protected function addCalculations() {
-		if ($this->Training->getVdotCorrected() > 0 || $this->Training->getJDintensity() > 0) {
-			$this->BoxedValues[] = new BoxedValue(Helper::Unknown($this->Training->getCurrentlyUsedVdot(), '-'), '', __('VDOT'), $this->Training->DataView()->getVDOTicon());
-			$this->BoxedValues[] = new BoxedValue(Helper::Unknown($this->Training->getJDintensity(), '-'), '', __('Training points'));
+		if ($this->Context->dataview()->vo2max()->value() > 0) {
+			$this->BoxedValues[] = new BoxedValue(Helper::Unknown($this->Context->dataview()->vo2max()->value(), '-'), '', 'VO<sub>2</sub>max', $this->Context->dataview()->effectiveVO2maxIcon());
 		}
 	}
 
 	/**
 	 * Add info link
 	 */
-	protected function addVdotInfoLink() {
-		$InfoLink = Ajax::window('<a href="'.$this->Training->Linker()->urlToVDOTInfo().'">'.__('More about VDOT calculation').'</a>', 'small');
+	protected function addVO2maxInfoLink() {
+		if (!Request::isOnSharedPage() && $this->Context->dataview()->vo2max()->value() > 0) {
+			$Linker = new Activity\Linker($this->Context->activity());
+			$InfoLink = Ajax::window('<a href="'.$Linker->urlToVO2maxinfo().'">'.__('More about VO<sub>2</sub>max calculation').'</a>', 'small');
 
-		$this->Content = HTML::info( $InfoLink );
+			$this->Footer .= HTML::info( $InfoLink );
+		}
 	}
 
 	/**
 	 * Add: average heartrate
 	 */
 	protected function addAverageHeartrate() {
-		if ($this->Training->getPulseAvg() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getPulseAvg(), 'bpm', __('&oslash; Heartrate'));
-			$this->BoxedValues[] = new BoxedValue(Running::PulseInPercent($this->Training->getPulseAvg()), '&#37;', __('&oslash; Heartrate'));
+		if ($this->Context->activity()->hrAvg() > 0) {
+			$this->BoxedValues[] = new BoxedValue($this->Context->dataview()->hrAvg()->inBPM(), 'bpm', __('avg.').' '.__('Heart rate'));
+
+			if ($this->Context->dataview()->hrMax()->canShowInHRmax()) {
+				$this->BoxedValues[] = new BoxedValue($this->Context->dataview()->hrAvg()->inPercent(), '&#37;', __('avg.').' '.__('Heart rate'));
+			}
 		}
 	}
 
@@ -125,9 +169,12 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: average heartrate
 	 */
 	protected function addMaximalHeartrate() {
-		if ($this->Training->getPulseMax() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getPulseMax(), 'bpm', __('max. Heartrate'));
-			$this->BoxedValues[] = new BoxedValue(Running::PulseInPercent($this->Training->getPulseMax()), '&#37;', __('max. Heartrate'));
+		if ($this->Context->activity()->hrMax() > 0) {
+			$this->BoxedValues[] = new Box\MaximalHeartRateInBPM($this->Context->dataview()->hrMax());
+
+			if ($this->Context->dataview()->hrMax()->canShowInHRmax()) {
+				$this->BoxedValues[] = new Box\MaximalHeartRateInPercent($this->Context->dataview()->hrMax(), !Request::isOnSharedPage());
+			}
 		}
 	}
 
@@ -135,9 +182,9 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: calories/trimp
 	 */
 	protected function addCaloriesAndTrimp() {
-		if ($this->Training->getCalories() > 0 || $this->Training->getTrimp() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getCalories(), 'kcal', __('Calories'));
-			$this->BoxedValues[] = new BoxedValue($this->Training->getTrimp(), '', __('TRIMP'));
+		if ($this->Context->activity()->energy() > 0 || $this->Context->activity()->trimp() > 0) {
+			$this->BoxedValues[] = new Box\Energy($this->Context);
+			$this->BoxedValues[] = new Box\Trimp($this->Context);
 		}
 	}
 
@@ -145,15 +192,21 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: elevation
 	 */
 	protected function addElevation() {
-		if ($this->Training->getDistance() > 0) {
-			$this->BoxedValues[] = new BoxedValue($this->Training->getDistance(), 'km', __('Distance'));
-			$this->BoxedValues[] = new BoxedValue($this->Training->getElevation(), 'm', __('Elevation'));
+		if ($this->Context->activity()->distance() > 0 || $this->Context->activity()->elevation() > 0) {
+			if ($this->Context->activity()->distance() > 0 && !(Configuration::ActivityView()->plotMode()->showCollection() && Configuration::ActivityView()->mapFirst())) {
+				$this->BoxedValues[] = new Box\Distance($this->Context);
+			}
+
+			$this->BoxedValues[] = new Box\Elevation($this->Context);
 
 			// TODO: Calculated elevation?
 
-			if ($this->Training->getElevation() > 0) {
-				$this->BoxedValues[] = new BoxedValue(substr($this->Training->DataView()->getGradientInPercent(),0,-6), '&#37;', __('&oslash; Gradient'));
-				$this->BoxedValues[] = new BoxedValue(substr($this->Training->DataView()->getElevationUpAndDown(),0,-7), 'm', __('Elevation up/down'));
+			if ($this->Context->activity()->elevation() > 0) {
+				if ($this->Context->activity()->distance() > 0) {
+					$this->BoxedValues[] = new Box\Gradient($this->Context);
+				}
+
+				$this->BoxedValues[] = new Box\ElevationUpDown($this->Context);
 			}
 		}
 	}
@@ -162,8 +215,8 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add: course
 	 */
 	protected function addCourse() {
-		if (strlen($this->Training->getRoute()) > 0) {
-			$PathBox = new BoxedValue($this->Training->getRoute(), '', __('Course'));
+		if ($this->Context->hasRoute() && strlen($this->Context->route()->name()) > 0) {
+			$PathBox = new BoxedValue($this->Context->route()->name(), '', __('Course'));
 			$PathBox->defineAsFloatingBlock('w100 flexible-height');
 
 			$this->BoxedValues[] = $PathBox;
@@ -174,14 +227,17 @@ class SectionCompositeRow extends TrainingViewSectionRowTabbedPlot {
 	 * Add info link
 	 */
 	protected function addElevationInfoLink() {
-		$InfoLink = Ajax::window('<a href="'.$this->Training->Linker()->urlToElevationInfo().'">'.__('More about elevation').'</a>', 'small');
+		if (!Request::isOnSharedPage()) {
+			$Linker = new Activity\Linker($this->Context->activity());
+			$InfoLink = Ajax::window('<a href="'.$Linker->urlToElevationInfo().'">'.__('More about elevation').'</a>', 'normal');
+			$this->Footer .= HTML::info( $InfoLink );
+		}
 
-		$this->Content = HTML::info( $InfoLink );
-
-		if ($this->Training->elevationWasCorrected())
-			$this->Content .= HTML::info( __('Elevation data were corrected.') );
-		elseif ($this->Training->hasArrayAltitude() && Configuration::ActivityForm()->correctElevation())
-			$this->Content .= HTML::warning( __('Elevation data are not corrected.') );
+		if ($this->Context->route()->hasCorrectedElevations()) {
+			$this->Footer .= HTML::info( __('Elevation data were corrected.') );
+		} elseif ($this->Context->route()->hasOriginalElevations() && Configuration::ActivityForm()->correctElevation()) {
+			$this->Footer .= HTML::warning( __('Elevation data are not corrected.') );
+		}
 
 		// TODO: Add link to correct them now!
 	}

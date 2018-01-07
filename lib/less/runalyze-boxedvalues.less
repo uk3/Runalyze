@@ -101,10 +101,29 @@
 	display: block;
 	text-align: right;
 	overflow: hidden;
+	white-space: nowrap;
 	text-overflow: ellipsis;
+
+	sub {
+		line-height: 0;
+	}
 }
 
 .flexible-height .boxed-value {
 	white-space: normal;
 	height: auto;
+}
+
+
+#sports .boxed-value-container.with-icon i {
+  left: 15px;
+  font-size: 22px;
+  line-height: 22px;
+  margin-top: -11px;
+}
+
+.dataset-sport {
+  padding: 1px;
+  font-size: 14px;
+  line-height: 18px;
 }

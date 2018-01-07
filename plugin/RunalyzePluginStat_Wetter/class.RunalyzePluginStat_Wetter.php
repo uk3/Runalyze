@@ -5,8 +5,10 @@
  */
 $PLUGINKEY = 'RunalyzePluginStat_Wetter';
 
-use \Runalyze\Data\Weather;
-use Runalyze\Configuration;
+use Runalyze\Activity\Temperature;
+use Runalyze\Util\LocalTime;
+use Runalyze\Data\Weather\WindSpeed;
+use Runalyze\Data\Weather\Humidity;
 
 /**
  * Class: RunalyzePluginStat_Wetter
@@ -14,10 +16,11 @@ use Runalyze\Configuration;
  * @package Runalyze\Plugins\Stats
  */
 class RunalyzePluginStat_Wetter extends PluginStat {
-	private $i      = 0;
-	private $jahr   = '';
-	private $jstart = 0;
-	private $jende  = 0;
+	/** @var int */
+	protected $EquipmentTypeId;
+
+	/** @var array array(id => name) */
+	protected $AllTypes = array();
 
 	/**
 	 * Name
@@ -32,7 +35,7 @@ class RunalyzePluginStat_Wetter extends PluginStat {
 	 * @return string
 	 */
 	final public function description() {
-		return __('Statistics about weather conditions, temperatures and clothing.');
+		return __('Statistics about weather conditions and temperatures.');
 	}
 
 	/**
@@ -40,19 +43,35 @@ class RunalyzePluginStat_Wetter extends PluginStat {
 	 */
 	protected function displayLongDescription() {
 		echo HTML::p( __('There is no bad weather, there is only bad clothing.') );
-		echo HTML::p( __('Are you a wimp or a tough runner?'. 
-						'Have a look at these statistics about the weather conditions and your clothing while training.') );
+		echo HTML::p( __('Are you a wimp or a tough runner? '. 
+						'Have a look at these statistics about the weather conditions.') );
 	}
 
 	/**
 	 * Init configuration
 	 */
 	protected function initConfiguration() {
+		$this->AllTypes = array(0 => __('none'));
+		$AllTypes = DB::getInstance()->query('SELECT `id`, `name` FROM `'.PREFIX.'equipment_type` WHERE `accountid`="'.SessionAccountHandler::getId().'" ORDER BY `name` ASC')->fetchAll();
+
+		foreach ($AllTypes as $data) {
+			$this->AllTypes[$data['id']] = $data['name'];
+		}
+
+		$Types = new PluginConfigurationValueSelect('equipment_type', __('Equipment type to display'));
+		$Types->setOptions($this->AllTypes);
+
 		$Configuration = new PluginConfiguration($this->id());
-		$Configuration->addValue( new PluginConfigurationValueBool('for_weather', __('Show statistics about weather conditions'), '', true) );
-		$Configuration->addValue( new PluginConfigurationValueBool('for_clothes', __('Show statistics about your clothing'), '', true) );
+		$Configuration->addValue($Types);
+
+		if (isset($_GET['dat']) && isset($this->AllTypes[$_GET['dat']])) {
+			$Configuration->object('equipment_type')->setValue($_GET['dat']);
+			$Configuration->update('equipment_type');
+			Cache::delete(PluginConfiguration::CACHE_KEY);
+		}
 
 		$this->setConfiguration($Configuration);
+		$this->EquipmentTypeId = (int)$this->Configuration()->value('equipment_type');
 	}
 
 	/**
@@ -61,23 +80,47 @@ class RunalyzePluginStat_Wetter extends PluginStat {
 	 */
 	protected function getToolbarNavigationLinks() {
 		$LinkList = array();
+		$LinkList[] = '<li>'.Ajax::window('<a href="plugin/'.$this->key().'/window.php">'.Ajax::tooltip(Icon::$LINE_CHART, __('Show temperature plots')).'</a>').'</li>';
 
-		if ($this->Configuration()->value('for_weather'))
-			$LinkList[] = '<li>'.Ajax::window('<a href="plugin/'.$this->key().'/window.php">'.Ajax::tooltip(Icon::$LINE_CHART, __('Show temperature plots')).'</a>').'</li>';
+		if (count($this->AllTypes) > 1) {
+			$LinkList[] = '<li class="with-submenu"><span class="link">'.$this->AllTypes[$this->EquipmentTypeId].'</span><ul class="submenu">';
+
+			foreach ($this->AllTypes as $id => $name) {
+				$active = ($id == $this->EquipmentTypeId);
+				$LinkList[] = '<li'.($active ? ' class="active"' : '').'>'.$this->getInnerLink($name, false, false, $id).'</li>';
+			}
+		}
+
+		$LinkList[] = '</ul></li>';
 
 		return $LinkList;
+	}
+
+	/**
+	 * Timer for year or ordered months
+	 * @param bool $addTableName must be used if query contains joins
+	 * @return string
+	 */
+	protected function getTimerForOrderingInQuery($addTableName = false) {
+		$time = $addTableName ? '`'.PREFIX.'training`.`time`' : '`time`';
+
+		if ($this->showsAllYears()) {
+			// Ensure month-wise data
+			return 'MONTH(FROM_UNIXTIME('.$time.'))';
+		}
+
+		return parent::getTimerForOrderingInQuery($addTableName);
 	}
 
 	/**
 	 * Init data 
 	 */
 	protected function prepareForDisplay() {
-		$this->initData();
-
-		$this->setYearsNavigation();
+		$this->setSportsNavigation(true, true);
+		$this->setYearsNavigation(true, true, true);
 		$this->setToolbarNavigationLinks($this->getToolbarNavigationLinks());
 
-		$this->setHeader($this->getHeader());
+		$this->setHeaderWithSportAndYear();
 	}
 
 	/**
@@ -86,286 +129,90 @@ class RunalyzePluginStat_Wetter extends PluginStat {
 	 */
 	protected function displayContent() {
 		$this->displayExtremeTrainings();
-		$this->displayMonthTable();
-		$this->displayClothesTable();
+		$this->displayMonthwiseTable();
 
-		if (!$this->Configuration()->value('for_weather') && !$this->Configuration()->value('for_clothes'))
-			echo HTML::warning( __('You have to activate some statistics in the plugin configuration.') );
+		if ($this->knowsEquipmentType()) {
+			$this->displayEquipmentTable();
+		}
 	}
 
-	/**
-	 * Display month-table
+    /**
+	 * Display extreme trainings
 	 */
-	private function displayMonthTable() {
-		echo '<table class="fullwidth zebra-style r">';
-		echo '<thead>'.HTML::monthTR(8, 1).'</thead>';
-		echo '<tbody>';
+	protected function displayExtremeTrainings() {
+		$hot  = DB::getInstance()->query('SELECT `temperature`, `id`, `time` FROM `'.PREFIX.'training` WHERE `temperature` IS NOT NULL '.$this->getSportAndYearDependenceForQuery().' AND accountid = '.SessionAccountHandler::getId().' ORDER BY `temperature` DESC LIMIT 5')->fetchAll();
+		$cold = DB::getInstance()->query('SELECT `temperature`, `id`, `time` FROM `'.PREFIX.'training` WHERE `temperature` IS NOT NULL '.$this->getSportAndYearDependenceForQuery().' AND accountid = '.SessionAccountHandler::getId().' ORDER BY `temperature` ASC LIMIT 5')->fetchAll();
+		$windiest = DB::getInstance()->query('SELECT `wind_speed`, `id`, `time` FROM `'.PREFIX.'training` WHERE `wind_speed` IS NOT NULL '.$this->getSportAndYearDependenceForQuery().' AND accountid = '.SessionAccountHandler::getId().' ORDER BY `wind_speed` DESC LIMIT 5')->fetchAll();
+		$maxhumidity = DB::getInstance()->query('SELECT `humidity`, `id`, `time` FROM `'.PREFIX.'training` WHERE `humidity` IS NOT NULL '.$this->getSportAndYearDependenceForQuery().' AND accountid = '.SessionAccountHandler::getId().' ORDER BY `humidity` DESC LIMIT 5')->fetchAll();
 
-		if ($this->Configuration()->value('for_weather')) {
-			$this->displayMonthTableTemp();
-			$this->displayMonthTableWeather();
+		foreach ($hot as $i => $h) {
+			$hot[$i] = Temperature::format($h['temperature'], true).' ' .__('on').' '.Ajax::trainingLink($h['id'], (new LocalTime($h['time']))->format('d.m.Y'));
 		}
 
-		if ($this->Configuration()->value('for_clothes')) {
-			$this->displayMonthTableClothes();
+		foreach ($cold as $i => $c) {
+			$cold[$i] = Temperature::format($c['temperature'], true).' ' .__('on').' '.Ajax::trainingLink($c['id'], (new LocalTime($c['time']))->format('d.m.Y'));
 		}
-
-		echo '</tbody>';
-		echo '</table>';
-	}
-
-	/**
-	* Display month-table for temperature
-	*/
-	private function displayMonthTableTemp() {
-		echo '<tr class="top-spacer"><td>&#176;C</td>';
-
-		$temps = DB::getInstance()->query('
-			SELECT
-				AVG(`temperature`) as `temp`,
-				MONTH(FROM_UNIXTIME(`time`)) as `m`
-			FROM `'.PREFIX.'training` WHERE
-				`sportid`="'.Configuration::General()->mainSport().'" AND
-				`temperature` IS NOT NULL
-				'.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').'
-			GROUP BY MONTH(FROM_UNIXTIME(`time`))
-			ORDER BY `m` ASC
-			LIMIT 12')->fetchAll();
-
-		$i = 1;
-
-		if (!empty($temps)) {
-			foreach ($temps as $temp) {
-				for (; $i < $temp['m']; $i++)
-					echo HTML::emptyTD();
-				$i++;
 		
-				echo '<td>'.round($temp['temp']).' &deg;C</td>';
-			}
-
-			for (; $i <= 12; $i++)
-				echo HTML::emptyTD();
-		} else {
-			echo HTML::emptyTD(12);
+		foreach ($windiest as $i => $w) {
+			$windiest[$i] = (new WindSpeed($w['wind_speed']))->string().' '.__('on').' '.Ajax::trainingLink($w['id'], (new LocalTime($w['time']))->format('d.m.Y'));
 		}
-
-		echo '</tr>';
-	}
-
-	/**
-	* Display month-table for weather
-	*/
-	private function displayMonthTableWeather() {
-		$Condition = new Weather\Condition(0);
-		$Statement = DB::getInstance()->prepare('
-			SELECT
-				SUM(1) as `num`,
-				MONTH(FROM_UNIXTIME(`time`)) as `m`
-			FROM `'.PREFIX.'training` WHERE
-				`sportid`=? AND
-				`weatherid`=?
-				'.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').'
-			GROUP BY MONTH(FROM_UNIXTIME(`time`))
-			ORDER BY `m` ASC
-			LIMIT 12
-		');
-
-		foreach (Weather\Condition::completeList() as $id) {
-			$Condition->set($id);
-			$Statement->execute(array(Configuration::General()->mainSport(), $id));
-			$data = $Statement->fetchAll();
-			$i = 1;
-
-			echo '<tr><td>'.$Condition->icon()->code().'</td>';
-
-			if (!empty($data)) {
-				foreach ($data as $dat) {
-					for (; $i < $dat['m']; $i++)
-						echo HTML::emptyTD();
-					$i++;
-			
-					echo ($dat['num'] != 0)
-						? '<td>'.$dat['num'].'x</td>'
-						: HTML::emptyTD();
-				}
-			
-				for (; $i <= 12; $i++)
-					echo HTML::emptyTD();
-			} else {
-				echo HTML::emptyTD(12);
-			}
-		}
-	
-		echo '</tr>';
-	}
-
-	/**
-	* Display month-table for clothes
-	*/
-	private function displayMonthTableClothes() {
-		$nums = DB::getInstance()->query('SELECT
-				SUM(1) as `num`,
-				MONTH(FROM_UNIXTIME(`time`)) as `m`
-			FROM `'.PREFIX.'training` WHERE
-				`sportid`="'.Configuration::General()->mainSport().'" AND
-				`clothes`!=""
-				'.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').'
-			GROUP BY MONTH(FROM_UNIXTIME(`time`))
-			ORDER BY `m` ASC
-			LIMIT 12')->fetchAll();
 		
-		if (!empty($nums)) {
-			foreach ($nums as $dat)
-				$num[$dat['m']] = $dat['num'];
+		foreach ($maxhumidity as $i => $h) {
+			$maxhumidity[$i] = (new Humidity($h['humidity']))->string().' '.__('on').' '.Ajax::trainingLink($h['id'], (new LocalTime($h['time']))->format('d.m.Y'));
 		}
+		
+		echo '<p>';
+		echo '<strong>'.__('Hottest activities').':</strong> ';
+		echo (empty($hot) ? __('none') : implode(', ', $hot)).'<br>';
+		echo (empty($hot) ? __('none') : '<strong>'.__('Coldest activities')).':</strong> ';
+		echo implode(', ', $cold).'<br>';
+		echo '<strong>'.__('Most windy activities').':</strong> ';
+		echo (empty($windiest) ? __('none') : implode(', ', $windiest)).'<br>';
+		echo '<strong>'.__('Highest humidity activities').':</strong> ';
+		echo (empty($maxhumidity) ? __('none') : implode(', ', $maxhumidity)).'<br>';
+		echo '</p>';
+	}
 
-		$kleidungen = DB::getInstance()->query('SELECT `id`, `name` FROM `'.PREFIX.'clothes` ORDER BY `order` ASC')->fetchAll();
-		if (!empty($kleidungen)) {
-			foreach ($kleidungen as $k => $kleidung) {
-				echo '<tr class="'.($k == 0 ? 'top-spacer' : '').'"><td>'.$kleidung['name'].'</td>';
-			
-				$i = 1;
-				$data = DB::getInstance()->query('SELECT
-						SUM(IF(FIND_IN_SET("'.$kleidung['id'].'", `clothes`)!=0,1,0)) as `num`,
-						MONTH(FROM_UNIXTIME(`time`)) as `m`
-					FROM `'.PREFIX.'training` WHERE
-						`sportid`="'.Configuration::General()->mainSport().'"
-						'.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').'
-					GROUP BY MONTH(FROM_UNIXTIME(`time`))
-					HAVING `num`!=0
-					ORDER BY `m` ASC
-					LIMIT 12')->fetchAll();
-
-				if (!empty($data)) {
-					foreach ($data as $dat) {
-						for (; $i < $dat['m']; $i++)
-							echo HTML::emptyTD();
-						$i++;
-
-						if ($dat['num'] != 0)
-							echo '
-								<td class="r"><span title="'.$dat['num'].'x">
-										'.round($dat['num']*100/$num[$dat['m']]).' &#37;
-								</span></td>';
-						else
-							echo HTML::emptyTD();
-					}
-
-					for (; $i <= 12; $i++)
-						echo HTML::emptyTD();
-				} else {
-					echo '<td colspan="12"></td>';
-				}
-
-				echo '</tr>';
-			}
-		}
+	/**
+	 * @return bool
+	 */
+	protected function knowsEquipmentType() {
+		return ($this->EquipmentTypeId > 0) && isset($this->AllTypes[$this->EquipmentTypeId]);
 	}
 
 	/**
 	 * Display table for clothes
 	 */
-	private function displayClothesTable() {
-		if (!$this->Configuration()->value('for_clothes'))
-			return;
+	protected function displayMonthwiseTable() {
+		require_once __DIR__.'/MonthwiseTable.php';
 
-		echo '<table class="fullwidth zebra-style">
-			<thead><tr>
-				<th></th>
-				<th>'.__('Temperatures').'</th>
-				<th>&Oslash;</th>
-				<th colspan="2"></th>
-				<th>'.__('Temperatures').'</th>
-				<th>&Oslash;</th>
-				<th colspan="2"></th>
-				<th>'.__('Temperatures').'</th>
-				<th>&Oslash;</th>
-			</tr></thead>';
-		echo '<tr class="r">';
+		$num = $this->showsLast6Months() ? 6 : 12;
+		$offset = $this->showsTimeRange() ? date('m') - $num - 1 + 12 : -1;
 
-		$kleidungen = DB::getInstance()->query('SELECT * FROM `'.PREFIX.'clothes` ORDER BY `order` ASC')->fetchAll();
-		if (!empty($kleidungen)) {
-			foreach ($kleidungen as $i => $kleidung) {
-				if ($i%3 == 0)
-					echo '</tr><tr class="r">';
-				else
-					echo '<td>&nbsp;&nbsp;</td>';
-
-				$dat = DB::getInstance()->query('SELECT
-						AVG(`temperature`) as `avg`,
-						MAX(`temperature`) as `max`,
-						MIN(`temperature`) as `min`
-					FROM `'.PREFIX.'training`
-					WHERE
-						`sportid`="'.Configuration::General()->mainSport().'" AND
-						`temperature` IS NOT NULL AND
-						FIND_IN_SET('.$kleidung['id'].',`clothes`) != 0
-					'.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : ''))->fetch();
-
-				echo '<td class="l">'.$kleidung['name'].'</td>';
-
-				if (isset($dat['min'])) {
-					echo '<td>'.($dat['min']).'&deg;C '.__('to').' '.($dat['max']).'&deg;C</td>';
-					echo '<td>'.round($dat['avg']).'&deg;C</td>';
-				} else {
-					echo '<td colspan="2" class="c"><em>-</em></td>';
-				}
-			}
-		}
-
-		for (; $i%3 != 2; $i++)
-			echo HTML::emptyTD(3);
-
-		echo '</tr>';
-		echo '</table>';
+		$Table = new \Runalyze\Plugin\Stat\Wetter\MonthwiseTable(
+			DB::getInstance(),
+			SessionAccountHandler::getId(),
+			$this->EquipmentTypeId
+		);
+		$Table->setDependency($this->getSportAndYearDependenceForQuery(true));
+		$Table->setGroupBy($this->getTimerIndexForQuery(true));
+		$Table->setOrderBy($this->getTimerForOrderingInQuery(true));
+		$Table->setMonthOffset($offset);
+		$Table->display();
 	}
 
 	/**
-	 * Display extreme trainings
+	 * Display table for clothes
 	 */
-	private function displayExtremeTrainings() {
-		$hot  = DB::getInstance()->query('SELECT `temperature`, `id`, `time` FROM `'.PREFIX.'training` WHERE `temperature` IS NOT NULL '.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').' ORDER BY `temperature` DESC LIMIT 5')->fetchAll();
-		$cold = DB::getInstance()->query('SELECT `temperature`, `id`, `time` FROM `'.PREFIX.'training` WHERE `temperature` IS NOT NULL '.($this->year != -1 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.$this->year : '').' ORDER BY `temperature` ASC LIMIT 5')->fetchAll();
+	protected function displayEquipmentTable() {
+		require_once __DIR__.'/MinMaxTableForEquipment.php';
 
-		foreach ($hot as $i => $h)
-			$hot[$i] = $h['temperature'].'&nbsp;&#176;C '.__('on').' '.Ajax::trainingLink($h['id'], date('d.m.Y', $h['time']));
-		foreach ($cold as $i => $c)
-			$cold[$i] = $c['temperature'].'&nbsp;&#176;C '.__('on').' '.Ajax::trainingLink($c['id'], date('d.m.Y', $c['time']));
-
-		echo '<p>';
-		echo '<strong>'.__('Hottest activities').':</strong> '.NL;
-		echo implode(', '.NL, $hot).'<br>'.NL;
-		echo '<strong>'.__('Coldest activities').':</strong> '.NL;
-		echo implode(', '.NL, $cold).'<br>'.NL;
-		echo '</p>';
-	}
-
-	/**
-	 * Initialize internal data
-	 */
-	private function initData() {
-		if ($this->year == -1) {
-			$this->i      = 0;
-			$this->jahr   = "Gesamt";
-			$this->jstart = mktime(0,0,0,1,1,START_YEAR);
-			$this->jende  = time();
-		} else {
-			$this->i      = $this->year;
-			$this->jahr   = $this->year;
-			$this->jstart = mktime(0,0,0,1,1,$this->i);
-			$this->jende  = mktime(23,59,59,1,0,$this->i+1);
-		}
-	}
-
-	/**
-	 * Get header depending on config
-	 */
-	private function getHeader() {
-		$header = 'Wetter';
-
-		if ($this->Configuration()->value('for_clothes'))
-			$header = ($this->Configuration()->value('for_weather')) ? __('Weather and Clothing') : __('Clothing');
-
-		return $header.': '.$this->jahr;
+		$Table = new \Runalyze\Plugin\Stat\Wetter\MinMaxTableForEquipment(
+			DB::getInstance(),
+			SessionAccountHandler::getId(),
+			$this->EquipmentTypeId
+		);
+		$Table->setDependency($this->getSportAndYearDependenceForQuery(true));
+		$Table->display();
 	}
 }

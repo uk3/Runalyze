@@ -5,7 +5,7 @@
  */
 /**
  * Section of the training view
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -20,7 +20,7 @@ abstract class TrainingViewSectionTabbedPlot extends TrainingViewSection {
 	 * Append row
 	 * @param TrainingViewSectionRowTabbedPlot $Row
 	 */
-	final protected function appendRowTabbedPlot(TrainingViewSectionRowTabbedPlot &$Row) {
+	final protected function appendRowTabbedPlot(TrainingViewSectionRowTabbedPlot $Row) {
 		$this->Rows[] = $Row;
 		$this->Links += $Row->getLinks();
 
@@ -58,6 +58,10 @@ abstract class TrainingViewSectionTabbedPlot extends TrainingViewSection {
 
 		foreach ($this->Links as $key => $Title)
 			echo Ajax::change($Title, 'training-view-tabbed-'.$this->cssId(), 'training-view-tabbed-'.$this->cssId().'-'.$key);
+
+		if (count($this->Links) > 1) {
+			echo Ajax::change('<i class="fa fa-fw fa-bars"></i> '.__('All'), 'training-view-tabbed-'.$this->cssId(), 'training-view-tabbed-'.$this->cssId());
+		}
 
 		echo '</div>';
 	}

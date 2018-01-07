@@ -7,7 +7,7 @@
 namespace Runalyze\Configuration\Category;
 
 use Runalyze\Configuration\Fieldset;
-use Runalyze\Parameter\Bool;
+use Runalyze\Parameter\Boolean;
 use Runalyze\Parameter\Application\DataBrowserMode;
 use Ajax;
 
@@ -30,9 +30,11 @@ class DataBrowser extends \Runalyze\Configuration\Category {
 	 */
 	protected function createHandles() {
 		$this->createHandle('DB_DISPLAY_MODE', new DataBrowserMode());
-		$this->createHandle('DB_SHOW_DIRECT_EDIT_LINK', new Bool(false));
-		$this->createHandle('DB_SHOW_CREATELINK_FOR_DAYS', new Bool(false));
-	}
+		$this->createHandle('DB_SHOW_DATASET_LABELS', new Boolean(true));
+		$this->createHandle('DB_SHOW_CREATELINK_FOR_DAYS', new Boolean(false));
+		$this->createHandle('DB_SHOW_ACTIVE_DAYS_ONLY', new Boolean(false));
+        $this->createHandle('DB_REVERSE_MODE', new Boolean(false));
+    }
 
 	/**
 	 * Mode
@@ -43,11 +45,11 @@ class DataBrowser extends \Runalyze\Configuration\Category {
 	}
 
 	/**
-	 * Show edit link
+	 * Show dataset labels
 	 * @return bool
 	 */
-	public function showEditLink() {
-		return $this->get('DB_SHOW_DIRECT_EDIT_LINK');
+	public function showLabels() {
+		return $this->get('DB_SHOW_DATASET_LABELS');
 	}
 
 	/**
@@ -57,19 +59,38 @@ class DataBrowser extends \Runalyze\Configuration\Category {
 	public function showCreateLink() {
 		return $this->get('DB_SHOW_CREATELINK_FOR_DAYS');
 	}
+	
+	/**
+	 * Show days with activities only
+	 * @return bool
+	 */
+	public function showActiveDaysOnly() {
+		return $this->get('DB_SHOW_ACTIVE_DAYS_ONLY');
+	}
+
+    /**
+     * Show days with activities only
+     * @return bool
+     */
+    public function reverseMode() {
+        return $this->get('DB_REVERSE_MODE');
+    }
 
 	/**
 	 * Register onchange events
 	 */
 	protected function registerOnchangeEvents() {
-		$this->handle('DB_DISPLAY_MODE')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
-		$this->handle('DB_SHOW_DIRECT_EDIT_LINK')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
+		$this->handle('DB_SHOW_DATASET_LABELS')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
 		$this->handle('DB_SHOW_CREATELINK_FOR_DAYS')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
+		$this->handle('DB_SHOW_ACTIVE_DAYS_ONLY')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
+        $this->handle('DB_REVERSE_MODE')->registerOnchangeFlag(Ajax::$RELOAD_DATABROWSER);
+
+		$this->handle('DB_DISPLAY_MODE')->registerOnchangeEvent('Runalyze\\Configuration\\Category\\DataBrowser::showNewTimerangeInDB');
 	}
 
 	/**
 	 * Fieldset
-	 * @return Runalyze\Configuration\Fieldset
+	 * @return \Runalyze\Configuration\Fieldset
 	 */
 	public function Fieldset() {
 		$Fieldset = new Fieldset( __('Calendar view') );
@@ -79,16 +100,35 @@ class DataBrowser extends \Runalyze\Configuration\Category {
 			'tooltip'	=> __('Default mode for the calendar')
 		));
 
+		$Fieldset->addHandle( $this->handle('DB_SHOW_DATASET_LABELS'), array(
+			'label'		=> __('Calendar: show labels for dataset')
+		));
+		
+		$Fieldset->addHandle( $this->handle('DB_SHOW_ACTIVE_DAYS_ONLY'), array(
+			'label'		=> __('Calendar: show days with activities only')
+		));
+
 		$Fieldset->addHandle( $this->handle('DB_SHOW_CREATELINK_FOR_DAYS'), array(
 			'label'		=> __('Calendar: create button'),
 			'tooltip'	=> __('Add a link for every day to create a new activity.')
 		));
 
-		$Fieldset->addHandle( $this->handle('DB_SHOW_DIRECT_EDIT_LINK'), array(
-			'label'		=> __('Calendar: edit button'),
-			'tooltip'	=> __('Add an edit-link for every activity.')
-		));
+        $Fieldset->addHandle( $this->handle('DB_REVERSE_MODE'), array(
+            'label'		=> __('Calendar').': '.__('reverse order'),
+            'tooltip'	=> __('Show days in reverse orders')
+        ));
 
 		return $Fieldset;
+	}
+
+	/**
+	 * Reload data browser for new timerange
+	 */
+	public static function showNewTimerangeInDB() {
+		$mode = \Runalyze\Configuration::DataBrowser()->mode();
+
+		$rel = $mode->showMonth() ? 'month-link' : 'week-link';
+
+		echo Ajax::wrapJSasFunction('$("#data-browser .panel-heading a[rel=\''.$rel.'\']").click();');
 	}
 }

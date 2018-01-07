@@ -3,9 +3,13 @@
  * This file contains class::TrainingViewSectionRowTabbedPlot
  * @package Runalyze\DataObjects\Training\View\Section
  */
+
+use Runalyze\View\Activity\Context;
+use Runalyze\View\Activity\Plot\ActivityPlot;
+
 /**
  * Row of the training view
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
@@ -22,6 +26,9 @@ abstract class TrainingViewSectionRowTabbedPlot extends TrainingViewSectionRow {
 	 */
 	protected $RightContentTitle = array();
 
+
+    protected $TopContent="";
+
 	/**
 	 * CSS id
 	 * @var string
@@ -31,8 +38,8 @@ abstract class TrainingViewSectionRowTabbedPlot extends TrainingViewSectionRow {
 	/**
 	 * Constructor
 	 */
-	public function __construct(TrainingObject &$Training) {
-		$this->Training = $Training;
+	public function __construct(Context $Context = null) {
+		$this->Context = $Context;
 
 		$this->setContent();
 		$this->setRightContent();
@@ -82,10 +89,13 @@ abstract class TrainingViewSectionRowTabbedPlot extends TrainingViewSectionRow {
 		echo '<div id="training-view-tabbed-'.$this->cssID.'" class="training-row-plot">';
 
 		$first = true;
+
+        echo $this->TopContent;
+
 		foreach ($this->RightContent as $key => $Content) {
 			echo '<div class="change" id="training-view-tabbed-'.$this->cssID.'-'.$key.'"'.(!$first ? ' style="display:none;"' : '').'>';
 
-			if ($Content instanceof TrainingPlot) {
+			if ($Content instanceof ActivityPlot) {
 				echo '<div id="plot-'.$Content->getKey().'" class="plot-container">';
 				$Content->display();
 				echo '</div>';

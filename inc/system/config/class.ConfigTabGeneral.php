@@ -13,7 +13,7 @@ use Runalyze\Configuration;
  */
 class ConfigTabGeneral extends ConfigTab {
 	/**
-	 * Set key and title for form 
+	 * Set key and title for form
 	 */
 	protected function setKeyAndTitle() {
 		$this->key = 'config_tab_general';
@@ -22,20 +22,19 @@ class ConfigTabGeneral extends ConfigTab {
 
 	/**
 	 * All categories
-	 * @return ConfigurationCategory[]
+	 * @return \Runalyze\Configuration\Category[]
 	 */
 	private function allCategories() {
 		return array(
 			Configuration::General(),
-			Configuration::Privacy(),
 			Configuration::ActivityView(),
 			Configuration::ActivityForm(),
 			Configuration::Design(),
 			Configuration::DataBrowser(),
-			Configuration::Vdot(),
+			Configuration::VO2max(),
 			Configuration::Trimp(),
-			Configuration::Misc()
-		);
+			Configuration::BasicEndurance()
+        );
 	}
 
 	/**
@@ -63,7 +62,7 @@ class ConfigTabGeneral extends ConfigTab {
 	}
 
 	/**
-	 * Parse all post values 
+	 * Parse all post values
 	 */
 	public function parsePostData() {
 		$Categories = $this->allCategories();

@@ -3,18 +3,15 @@
  * This file contains class::Splits
  * @package Runalyze\Data\Splits
  */
+
+use Runalyze\Activity\Duration;
+
 /**
  * Class for handling splits
  * @author Hannes Christiansen
  * @package Runalyze\Data\Splits
  */
 class Splits {
-	/**
-	 * Enum for constructor: Take data from post
-	 * @var enum
-	 */
-	static public $FROM_POST = 'TAKE_PARAMETER_FROM_POST';
-
 	/**
 	 * Splits as string
 	 * @var string
@@ -28,12 +25,19 @@ class Splits {
 	private $asArray = array();
 
 	/**
+	 * @var bool
+	 */
+	protected $transformDistanceUnit = false;
+
+	/**
 	 * Construct a new object of Splits
 	 * @param string $data [optional]
+	 * @param array $options
 	 */
-	public function __construct($data = '') {
-		if ($data == self::$FROM_POST)
-			$data = isset($_POST['splits']) ? $_POST['splits'] : array();
+	public function __construct($data = '', $options = array()) {
+		if (isset($options['transform-unit']) && $options['transform-unit'] === true) {
+			$this->transformDistanceUnit = true;
+		}
 
 		$this->createFromData($data);
 	}
@@ -63,12 +67,13 @@ class Splits {
 	 */
 	private function createFromArray($array) {
 		$this->asArray = array();
+		$factor = $this->transformDistanceUnit ? Runalyze\Configuration::General()->distanceUnitSystem()->distanceToKmFactor() : 1;
 
 		// TODO escaping
 		if (isset($array['km']) && isset($array['time']))
 			foreach ($array['km'] as $i => $km)
 				$this->asArray[] = array(
-					'km' => $km,
+					'km' => $km * $factor,
 					'time' => $array['time'][$i],
 					'active' => !isset($array['active']) || (isset($array['active']) && isset($array['active'][$i]) && $array['active'][$i])
 				);
@@ -105,15 +110,33 @@ class Splits {
 	 * @param bool $active optional
 	 */
 	public function addSplit($km, $timeInSeconds, $active = true) {
-		//if ($km <= 0)
-		//	return;
+		if ($km <= 0 && $timeInSeconds <= 0) {
+			return;
+		}
 
 		$this->asArray[] = array(
 			'km' => $this->formatKM($km),
-			'time' => Time::toString($timeInSeconds, false, false, false),
+			'time' => $this->formatTime($timeInSeconds),
 			'active' => $active
 		);
 		$this->arrayToString();
+	}
+
+	/**
+	 * Calculate and add last split
+	 * Add last split to fill up remaining time and distance,
+	 * calculated as difference between given distance/duration and current sum.
+	 * @param float $totalDistance [km] should be larger then current sum of splits
+	 * @param int $totalDuration [s] should be larger then current sum of splits
+	 * @param bool $active
+	 */
+	public function addLastSplitToComplete($totalDistance, $totalDuration, $active = true) {
+		$distance = $totalDistance - $this->totalDistance();
+		$time = $totalDuration - $this->totalTime();
+
+		if ($distance >= 0 && $time > 0) {
+			$this->addSplit($distance, $time, $active);
+		}
 	}
 
 	/**
@@ -129,7 +152,7 @@ class Splits {
 	/**
 	 * Get splits as readable string
 	 * @param bool $restingLaps optional
-	 * @return string 
+	 * @return string
 	 */
 	public function asReadableString($restingLaps = false) {
 		$strings = array();
@@ -153,7 +176,7 @@ class Splits {
 	}
 
 	/**
-	 * Transform splits from internal string to array 
+	 * Transform splits from internal string to array
 	 */
 	private function stringToArray() {
 		$this->asArray = array();
@@ -169,7 +192,7 @@ class Splits {
 
 			if (strlen($split) > 3)
 				$this->asArray[] = array(
-					'km' => rstrstr($split, '|'),
+					'km' => strstr($split, '|', true),
 					'time' => substr(strrchr($split, '|'), 1),
 					'active' => $active
 				);
@@ -177,7 +200,7 @@ class Splits {
 	}
 
 	/**
-	 * Clean internal array 
+	 * Clean internal array
 	 */
 	private function cleanArray() {
 		foreach ($this->asArray as $key => $split) {
@@ -187,8 +210,9 @@ class Splits {
 			//else
 			$this->asArray[$key]['km'] = $this->formatKM($split['km']);
 
-			if (substr($split['time'], -1) == 's')
-				$this->asArray[$key]['time'] = Time::toString(Time::toSeconds($split['time']), false, 2);
+			if (substr($split['time'], -1) == 's') {
+				$this->asArray[$key]['time'] = $this->formatTime(substr($split['time'], 0, -1));
+			}
 		}
 	}
 
@@ -198,7 +222,15 @@ class Splits {
 	 * @return string
 	 */
 	private function formatKM($km) {
-		return number_format(Helper::CommaToPoint($km), 2, '.', '');
+		return number_format(Helper::CommaToPoint($km), 3, '.', '');
+	}
+
+	/**
+	 * @param float $seconds
+	 * @return string
+	 */
+	private function formatTime($seconds) {
+		return Duration::format(round($seconds));
 	}
 
 	/**
@@ -216,14 +248,17 @@ class Splits {
 	/**
 	 * Get all times as array
 	 * @param bool $restingLaps optional
-	 * @return array 
+	 * @return array
 	 */
 	public function timesAsArray($restingLaps = false) {
 		$times = array();
 
-		foreach ($this->asArray as $split)
-			if ($restingLaps || $split['active'])
-				$times[] = Time::toSeconds($split['time']);
+		foreach ($this->asArray as $split) {
+			if ($restingLaps || $split['active']) {
+				$Duration = new Duration($split['time']);
+				$times[] = $Duration->seconds();
+			}
+		}
 
 		return $times;
 	}
@@ -235,8 +270,10 @@ class Splits {
 	public function totalTime() {
 		$time = 0;
 
-		foreach ($this->asArray as $split)
-			$time += Time::toSeconds($split['time']);
+		foreach ($this->asArray as $split) {
+			$Duration = new Duration($split['time']);
+			$time += $Duration->seconds();
+		}
 
 		return $time;
 	}
@@ -281,7 +318,7 @@ class Splits {
 	/**
 	 * Get all distances as array
 	 * @param bool $restingLaps optional
-	 * @return array 
+	 * @return array
 	 */
 	public function distancesAsArray($restingLaps = false) {
 		$distances = array();
@@ -309,14 +346,17 @@ class Splits {
 	/**
 	 * Get all paces as array
 	 * @param bool $restingLaps optional
-	 * @return array 
+	 * @return array
 	 */
 	public function pacesAsArray($restingLaps = false) {
 		$paces = array();
 
-		foreach ($this->asArray as $split)
-			if ($restingLaps || $split['active'])
-				$paces[] = $split['km'] > 0 ? (int)round(Time::toSeconds($split['time'])/$split['km']) : 0;
+		foreach ($this->asArray as $split) {
+			if ($restingLaps || $split['active']) {
+				$Duration = new Duration($split['time']);
+				$paces[] = $split['km'] > 0 ? (int)round($Duration->seconds()/$split['km']) : 0;
+			}
+		}
 
 		return $paces;
 	}
@@ -353,8 +393,9 @@ class Splits {
 
 		foreach ($this->asArray as &$split) {
 			if ($mode == 'km') {
-				$s = Time::toSeconds($split['time']);
-				while ($i < $size-1 && $s > $Time[$i] - $totalTime)
+				$Duration = new Duration($split['time']);
+
+				while ($i < $size-1 && $Duration->seconds() > $Time[$i] - $totalTime)
 					$i++;
 
 				$split['km'] = $this->formatKM($Distance[$i] - $totalDistance);
@@ -362,7 +403,7 @@ class Splits {
 				while ($i < $size-1 && $split['km'] > $Distance[$i] - $totalDistance)
 					$i++;
 
-				$split['time'] = Time::toString($Time[$i] - $totalTime, false, 2);
+				$split['time'] = $this->formatTime($Time[$i] - $totalTime);
 			}
 
 			$totalTime     = $Time[$i];
@@ -370,21 +411,5 @@ class Splits {
 		}
 
 		$this->arrayToString();
-	}
-
-	/**
-	 * Get fieldset
-	 * @return FormularFieldset
-	 * @codeCoverageIgnore
-	 */
-	public function getFieldset() {
-		$Fieldset = new FormularFieldset( __('Laps') );
-		$Fieldset->addField( new TrainingInputSplits() );
-		$Fieldset->addCSSclass( TrainingFormular::$ONLY_DISTANCES_CLASS );
-
-		if ($this->areEmpty())
-			$Fieldset->setCollapsed();
-
-		return $Fieldset;
 	}
 }

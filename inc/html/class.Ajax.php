@@ -5,9 +5,10 @@
  */
 /**
  * JavaScript/jQuery class
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\HTML
+ * @deprecated since v3.1
  */
 class Ajax {
 	/**
@@ -73,18 +74,30 @@ class Ajax {
 	/**
 	 * Init own JS-library on frontend (direct output)
 	 */
-	static public function initJSlibrary() {
+	public static function initJSlibrary() {
 		$Options = array();
 		$Options['sharedView'] = Request::isOnSharedPage();
 
 		echo self::wrapJS('Runalyze.init('.json_encode($Options).');');
+
+		if (defined('NOKIA_HERE_APPID') && NOKIA_HERE_APPID != '' && defined('NOKIA_HERE_TOKEN') && NOKIA_HERE_TOKEN != '') {
+			echo self::wrapJS('Runalyze.Options.setNokiaLayerAuth("'.NOKIA_HERE_APPID.'", "'.NOKIA_HERE_TOKEN.'")');
+		}
+		if (defined('THUNDERFOREST_API_KEY') && THUNDERFOREST_API_KEY != '') {
+                        echo self::wrapJS('Runalyze.Options.setThunderforestLayerAuth("'.THUNDERFOREST_API_KEY.'")');
+                }
+		if (defined('MAPBOX_API_KEY') && MAPBOX_API_KEY != '') {
+				echo self::wrapJS('Runalyze.Options.setMapboxLayerAuth("'.MAPBOX_API_KEY.'")');
+			}
+
+
 	}
 
 	/**
 	 * Set reload flag
-	 * @param enum $Flag 
+	 * @param int $Flag
 	 */
-	static public function setReloadFlag($Flag) {
+	public static function setReloadFlag($Flag) {
 		$BothFlags = array($Flag, self::$currentReloadFlag);
 
 		if (min($BothFlags) == self::$RELOAD_DATABROWSER && max($BothFlags) == self::$RELOAD_PLUGINS)
@@ -99,15 +112,15 @@ class Ajax {
 	 * Set ID of plugin to reload
 	 * @param int $ID
 	 */
-	static public function setPluginIDtoReload($ID) {
+	public static function setPluginIDtoReload($ID) {
 		self::$RELOAD_PLUGIN_ID = $ID;
 	}
 
 	/**
 	 * Get reload command
-	 * @return string 
+	 * @return string
 	 */
-	static public function getReloadCommand() {
+	public static function getReloadCommand() {
 		switch(self::$currentReloadFlag) {
 			case self::$RELOAD_PAGE:
 				return self::wrapJS('Runalyze.reloadPage();');
@@ -134,8 +147,8 @@ class Ajax {
 	 * @param bool $closeOverlay [optional] Boolean flag: Should the overlay be closed after clicking? (default: false)
 	 * @return string
 	 */
-	static function trainingLink($id, $name, $closeOverlay = false, $classes = '', $htmlID = '') {
-		return '<a '.(!empty($htmlID) ? 'id="'.$htmlID.'" ' : '').'class="training '.$classes.'" href="call/call.Training.display.php?id='.$id.'" rel="'.$id.'"'.($closeOverlay ? ' onclick="Runalyze.Overlay.close()"' : '').'>'.$name.'</a>';
+	public static function trainingLink($id, $name, $closeOverlay = false, $classes = '', $htmlID = '') {
+		return '<a '.(!empty($htmlID) ? 'id="'.$htmlID.'" ' : '').'class="training '.$classes.'" href="activity/'.$id.'" rel="'.$id.'"'.($closeOverlay ? ' onclick="Runalyze.Overlay.close()"' : '').'>'.$name.'</a>';
 	}
 
 	/**
@@ -143,11 +156,11 @@ class Ajax {
 	 * @param int $id ID of the training
 	 * @return string
 	 */
-	static function trainingLinkAsOnclick($id) {
+	public static function trainingLinkAsOnclick($id) {
 		if (FrontendShared::$IS_SHOWN)
-			return 'onclick="Runalyze.Training.load('.$id.', \''.SharedLinker::getUrlFor($id).'\')"';
+			return 'onclick="Pace.restart();Runalyze.Training.load('.$id.', \''.SharedLinker::getUrlFor($id).'\', event)"';
 
-		return 'onclick="Runalyze.Training.load('.$id.')"';
+		return 'onclick="Pace.restart();Runalyze.Training.load('.$id.', false, event)"';
 	}
 
 	/**
@@ -158,24 +171,25 @@ class Ajax {
 	 * @param boolean $onlyAttributes [optional]
 	 * @return string
 	 */
-	static function tooltip($html, $tooltip, $atLeft = false, $onlyAttributes = false) {
+	public static function tooltip($html, $tooltip, $atLeft = false, $onlyAttributes = false) {
 		if ($tooltip == '')
 			return $html;
 
 		$class = $atLeft ? is_string($atLeft) ? 'class="'.$atLeft.'"' : 'class="atLeft" ' : '';
 
 		if ($onlyAttributes)
-			return $class.'rel="tooltip" title="'.$tooltip.'"';
+			return $class.'rel="tooltip" title="'.htmlspecialchars($tooltip).'"';
 
-		return '<span '.$class.'rel="tooltip" title="'.$tooltip.'">'.$html.'</span>';
+		return '<span '.$class.'rel="tooltip" title="'.htmlspecialchars($tooltip).'">'.$html.'</span>';
 	}
 
 	/**
 	 * Get code for toolbar navigation for links as array (tag => ..., subs => array(..., ...))
 	 * @param array $Links
 	 * @param string $AdditionalClasses
+	 * @returns string
 	 */
-	static function toolbarNavigation($Links, $AdditionalClasses = '') {
+	public static function toolbarNavigation($Links, $AdditionalClasses = '') {
 		if (empty($Links))
 			return '';
 
@@ -212,7 +226,7 @@ class Ajax {
 	 * @param string $toggle_id   The ID of the css-container to toggle
 	 * @return string
 	 */
-	static function toggle($link, $toggle_id) {
+	public static function toggle($link, $toggle_id) {
 		$link = self::insertClass($link, 'toggle');
 		$link = self::insertRel($link, $toggle_id);
 
@@ -225,7 +239,7 @@ class Ajax {
 	 * @param string $size     Enum: big|normal|small
 	 * @return string
 	 */
-	static function window($link, $size = 'normal') {
+	public static function window($link, $size = 'normal') {
 		$link = self::insertClass($link, 'window');
 		if ($size == 'big' || $size == 'small')
 			$link = self::insertDataSize($link, $size);
@@ -240,7 +254,7 @@ class Ajax {
 	 * @param string $href   ID of div-container to be displayed
 	 * @return string
 	 */
-	static function change($name, $target, $href, $additional_class = '') {
+	public static function change($name, $target, $href, $additional_class = '') {
 		if (substr($href, 0, 1) != '#')
 			$href = '#'.$href;
 
@@ -259,8 +273,8 @@ class Ajax {
 	 * @param string $title   title
 	 * @return string
 	 */
-	static function link($name, $target, $href, $data = '', $title = '') {
-		return '<a class="ajax" href="'.$href.'" target="'.$target.'" rel="'.$data.'"'.(!empty($title) ? ' title="'.$title.'"' : '').'>'.$name.'</a>';
+	public static function link($name, $target, $href, $data = '', $title = '', $onclick = false) {
+		return '<a class="ajax" href="'.$href.'" target="'.$target.'" rel="'.$data.'"'.(!empty($title) ? ' title="'.$title.'"' : '').' '.(($onclick) ? ' onclick="'.$onclick.'"' : '').'>'.$name.'</a>';
 	}
 
 	/**
@@ -281,7 +295,7 @@ class Ajax {
 	 * @param string $class   The new css-class
 	 * @return string
 	 */
-	private static function insertClass($link, $class) {
+	public static function insertClass($link, $class) {
 		$text = preg_replace('#<a ([^>]*?)class="(.+?)"#i', '<a \\1class="'.$class.' \\2"', $link);
 		if ($text == $link)
 			$text = str_replace('<a ', '<a class="'.$class.'" ', $text);
@@ -295,7 +309,7 @@ class Ajax {
 	 * @param string $rel    The new rel-value
 	 * @return string
 	 */
-	private static function insertRel($link, $rel) {
+	public static function insertRel($link, $rel) {
 		$text = preg_replace('#rel="(.+?)"#i', 'rel="'.$rel.'"', $link);
 		if ($text == $link)
 			$text = str_replace('<a ', '<a rel="'.$rel.'" ', $text);
@@ -309,19 +323,12 @@ class Ajax {
 	 * @param string $rel    The new data-size-value
 	 * @return string
 	 */
-	private static function insertDataSize($link, $rel) {
+	public static function insertDataSize($link, $rel) {
 		$text = preg_replace('#data-size="(.+?)"#i', 'data-size="'.$rel.'"', $link);
 		if ($text == $link)
 			$text = str_replace('<a ', '<a data-size="'.$rel.'" ', $text);
 
 		return $text;
-	}
-
-	/**
-	 * Reload complete page
-	 */
-	public static function reloadPage() {
-		self::wrapJS('location.reload();');
 	}
 
 	/**
@@ -356,6 +363,7 @@ class Ajax {
 	 * @param array $input
 	 * @param array $funcs
 	 * @param int $level
+	 * @return string
 	 */
 	public static function json_encode_jsfunc($input, $funcs = array(), $level = 0) {
 		foreach($input as $key => $value) {
@@ -363,8 +371,8 @@ class Ajax {
 				$ret = self::json_encode_jsfunc($value, $funcs, 1);
 				$input[$key] = $ret[0];
 				$funcs = $ret[1];
-			} elseif (substr($value,0,8) == 'function') {
-                  $func_key = "#".uniqid()."#";
+			} elseif (substr($value,0,8) == 'function' || substr($value,0,13) == 'RunalyzePlot.') {
+                  $func_key = "#".uniqid(rand(), true)."#";
                   $funcs[$func_key] = $value;
                   $input[$key] = $func_key;
 			}
@@ -399,7 +407,7 @@ class Ajax {
 	/**
 	 * Create code for binding tablesorter with pager
 	 * @param string $selector
-	 * @param boolean $reinit [optional]
+	 * @param bool $reinit [optional]
 	 */
 	public static function createTablesorterWithPagerFor($selector, $reinit = false) {
 		echo self::getTablesorterWithPagerFor($selector, $reinit);
@@ -408,7 +416,8 @@ class Ajax {
 	/**
 	 * Create code for binding tablesorter with pager
 	 * @param string $selector
-	 * @param boolean $reinit [optional]
+	 * @param bool $reinit [optional]
+	 * @return string
 	 */
 	public static function getTablesorterWithPagerFor($selector, $reinit = false) {
 		$Code = self::getPagerDiv();
@@ -418,24 +427,17 @@ class Ajax {
 	}
 
 	/**
-	 * Print div for pager for tables
-	 */
-	private static function printPagerDiv() {
-		echo self::getPagerDiv();
-	}
-
-	/**
 	 * Get div for pager for tables
 	 */
 	private static function getPagerDiv() {
 		return '
 <div id="pager" class="pager c">
 	<form>
-		<a href="#main" class="first">|&laquo; '.__('Start').'</a>
-		<a href="#main" class="prev">&laquo; '.__('previous').'</a>
+		<span class="link first">|&laquo; '.__('Start').'</span>
+		<span class="link prev">&laquo; '.__('previous').'</span>
 		<input type="text" class="pagedisplay">
-		<a href="#main" class="next">'.__('next').' &raquo;</a>
-		<a href="#main" class="last">'.__('End').' &raquo;|</a>
+		<span class="link next">'.__('next').' &raquo;</span>
+		<span class="link last">'.__('End').' &raquo;|</span>
 
 		<select class="pagesize">
 			<option value="10">10 '.__('per page').'&nbsp;</option>

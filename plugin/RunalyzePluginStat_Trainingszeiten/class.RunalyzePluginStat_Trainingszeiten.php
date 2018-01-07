@@ -4,6 +4,11 @@
  * @package Runalyze\Plugins\Stats
  */
 $PLUGINKEY = 'RunalyzePluginStat_Trainingszeiten';
+
+use Runalyze\Model\Activity;
+use Runalyze\View\Activity\Linker;
+use Runalyze\View\Activity\Dataview;
+
 /**
  * Plugin "Trainingszeiten"
  * 
@@ -43,7 +48,7 @@ class RunalyzePluginStat_Trainingszeiten extends PluginStat {
 	 * Prepare
 	 */
 	protected function prepareForDisplay() {
-		$this->setYearsNavigation(true, true);
+		$this->setYearsNavigation(true, true, true);
 		$this->setSportsNavigation(true, true);
 
 		$this->setHeaderWithSportAndYear();
@@ -87,7 +92,7 @@ class RunalyzePluginStat_Trainingszeiten extends PluginStat {
 			$sports_not_short = $this->sportid.',';
 		} else {
 			$sports_not_short = '';
-			$sports = DB::getInstance()->query('SELECT `id` FROM `'.PREFIX.'sport` WHERE `short`=0')->fetchAll();
+			$sports = DB::getInstance()->query('SELECT `id` FROM `'.PREFIX.'sport` WHERE `accountid`='.SessionAccountHandler::getId().' AND `short`=0')->fetchAll();
 			foreach ($sports as $sport)
 				$sports_not_short .= $sport['id'].',';
 		}
@@ -105,8 +110,9 @@ class RunalyzePluginStat_Trainingszeiten extends PluginStat {
 			FROM `'.PREFIX.'training`
 			WHERE
 				`sportid` IN('.substr($sports_not_short,0,-1).') AND
-				(HOUR(FROM_UNIXTIME(`time`))!=0 OR MINUTE(FROM_UNIXTIME(`time`))!=0)
-				'.($this->year > 0 ? 'AND YEAR(FROM_UNIXTIME(`time`))='.(int)$this->year : '').'
+                                `accountid` = '.SessionAccountHandler::getId().' AND
+				(HOUR(FROM_UNIXTIME(`time`))!=0 OR MINUTE(FROM_UNIXTIME(`time`))!=0) 
+				'.$this->getYearDependenceForQuery().'
 			ORDER BY
 				ABS(12-(`H`+10)%24-`MIN`/60) ASC,
 				`MIN` DESC LIMIT 20
@@ -125,17 +131,20 @@ class RunalyzePluginStat_Trainingszeiten extends PluginStat {
 		echo '<tbody>';
 
 		foreach ($nights as $i => $data) {
-			$Training = new TrainingObject($data);
+			$Activity = new Activity\Entity($data);
+			$Linker = new Linker($Activity);
+			$View = new Dataview($Activity);
 
 			if ($i%2 == 0)
-				echo('<tr class="a'.(round($i/2)%2+1).'">');
-			echo('
-				<td class="b">'.$Training->DataView()->getDaytimeString().'</td>
-				<td>'.$Training->Linker()->linkWithSportIcon().'</td>
-				<td>'.$Training->DataView()->getKmOrTime().' '.$Training->Sport()->name().'</td>
-				<td>'.$Training->DataView()->getDateAsWeeklink().'</td>');
+				echo '<tr">';
+
+			echo '<td class="b">'.$View->daytime().'</td>
+				<td>'.$Linker->linkWithSportIcon().'</td>
+				<td>'.$View->distanceOrDuration().' '.SportFactory::name($Activity->sportid()).'</td>
+				<td>'.$Linker->weekLink().'</td>';
+
 			if ($i%2 == 1)
-				echo('</tr>');
+				echo '</tr>';
 		}
 
 		echo '</tbody></table>';

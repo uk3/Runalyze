@@ -1,149 +1,182 @@
 <?php
-/**
- * This file contains class::Athlete
- * @package Runalyze
- */
 
 namespace Runalyze;
 
-use \Runalyze\Parameter\Application\Gender;
+use Runalyze\Profile\Athlete\Gender;
 
-/**
- * Athlete
- * 
- * @author Hannes Christiansen
- * @package Runalyze
- */
-class Athlete {
-	/**
-	 * Gender
-	 * @var \Runalyze\Parameter\Application\Gender
-	 */
-	protected $Gender;
+class Athlete
+{
+    /** @var int */
+    protected $Gender;
 
-	/**
-	 * Maximal heart rate [bpm]
-	 * @var int
-	 */
-	protected $maximalHR = null;
+    /** @var null|int [bpm] */
+    protected $maximalHR = null;
 
-	/**
-	 * Resting heart rate [bpm]
-	 * @var int
-	 */
-	protected $restingHR = null;
+    /** @var null|int [bpm] */
+    protected $restingHR = null;
 
-	/**
-	 * Weight [kg]
-	 * @var float
-	 */
-	protected $weight = null;
+    /** @var null|float [kg] */
+    protected $weight = null;
 
-	/**
-	 * Age [years]
-	 * @var int
-	 */
-	protected $age = null;
+    /** @var null|int */
+    protected $birthyear = null;
 
-	/**
-	 * Create athlete
-	 * @param \Gender $Gender [optional]
-	 * @param int $maximalHR [optional]
-	 * @param int $restingHR [optional]
-	 * @param flot $weight [optional]
-	 * @param int $age [optional]
-	 */
-	public function __construct(
-		Gender $Gender = null,
-		$maximalHR = null,
-		$restingHR = null,
-		$weight = null,
-		$age = null
-	) {
-		$this->Gender = $Gender ?: new Gender();
-		$this->maximalHR = $maximalHR;
-		$this->restingHR = $restingHR;
-		$this->weight = $weight;
-		$this->age = $age;
-	}
+    /** @var float [ml/kg/min] */
+    protected $vo2max = 0.0;
 
-	/**
-	 * Gender
-	 * @return \Runalyze\Parameter\Application\Gender
-	 */
-	public function gender() {
-		return $this->Gender;
-	}
+    /**
+     * @param null|int $Gender see \Runalyze\Profile\Athlete\Gender
+     * @param null|int $maximalHR [bpm]
+     * @param null|int $restingHR [bpm]
+     * @param null|float $weight [kg]
+     * @param null|int $birthyear
+     * @param float $vo2max [ml/kg/min]
+     */
+    public function __construct(
+        $Gender = null,
+        $maximalHR = null,
+        $restingHR = null,
+        $weight = null,
+        $birthyear = null,
+        $vo2max = 0.0
+    )
+    {
+        $this->Gender = $Gender ?: Gender::NONE;
+        $this->maximalHR = $maximalHR;
+        $this->restingHR = $restingHR;
+        $this->weight = $weight;
+        $this->birthyear = $birthyear;
+        $this->vo2max = $vo2max;
+    }
 
-	/**
-	 * Maximal heart rate
-	 * @return int
-	 */
-	public function maximalHR() {
-		return $this->maximalHR;
-	}
+    /**
+     * Gender
+     *
+     * @see \Runalyze\Profile\Athlete\Gender
+     * @return null|int
+     */
+    public function gender()
+    {
+        return $this->Gender;
+    }
 
-	/**
-	 * Resting heart rate
-	 * @return int
-	 */
-	public function restingHR() {
-		return $this->restingHR;
-	}
+    /**
+     * @return null|int [bpm]
+     */
+    public function maximalHR()
+    {
+        return $this->maximalHR;
+    }
 
-	/**
-	 * Weight
-	 * @return int
-	 */
-	public function weight() {
-		return $this->weight;
-	}
+    /**
+     * @return null|int [bpm]
+     */
+    public function restingHR()
+    {
+        return $this->restingHR;
+    }
 
-	/**
-	 * Age
-	 * @return int
-	 */
-	public function age() {
-		return $this->age;
-	}
+    /**
+     * @return null|int [kg]
+     */
+    public function weight()
+    {
+        return $this->weight;
+    }
 
-	/**
-	 * Knows gender
-	 * @return bool
-	 */
-	public function knowsGender() {
-		return $this->Gender->hasGender();
-	}
+    /**
+     * @return null|int [years]
+     */
+    public function age()
+    {
+        return (null !== $this->birthyear) ? date("Y") - $this->birthyear : null;
+    }
 
-	/**
-	 * Knows maximal HR
-	 * @return bool
-	 */
-	public function knowsMaximalHeartRate() {
-		return (NULL !== $this->maximalHR);
-	}
+    /**
+     * @return null|int
+     */
+    public function birthyear()
+    {
+        return $this->birthyear;
+    }
 
-	/**
-	 * Knows resting HR
-	 * @return bool
-	 */
-	public function knowsRestingHeartRate() {
-		return (NULL !== $this->restingHR);
-	}
+    /**
+     * @return float
+     */
+    public function vo2max()
+    {
+        return $this->vo2max;
+    }
 
-	/**
-	 * Knows weight
-	 * @return bool
-	 */
-	public function knowsWeight() {
-		return (NULL !== $this->weight);
-	}
+    /**
+     * @return bool
+     */
+    public function knowsGender()
+    {
+        return ($this->Gender !== Gender::NONE && null !== $this->Gender);
+    }
 
-	/**
-	 * Knows age
-	 * @return bool
-	 */
-	public function knowsAge() {
-		return (NULL !== $this->age);
-	}
+    /**
+     * @return bool
+     */
+    public function isMale()
+    {
+        return Gender::MALE == $this->Gender;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isFemale()
+    {
+        return Gender::FEMALE == $this->Gender;
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsMaximalHeartRate()
+    {
+        return (null !== $this->maximalHR);
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsRestingHeartRate()
+    {
+        return (null !== $this->restingHR);
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsWeight()
+    {
+        return (null !== $this->weight);
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsBirthyear()
+    {
+        return (null !== $this->birthyear);
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsAge()
+    {
+        return (null !== $this->birthyear);
+    }
+
+    /**
+     * @return bool
+     */
+    public function knowsEffectiveVO2max()
+    {
+        return (0.0 !== $this->vo2max);
+    }
 }

@@ -33,7 +33,16 @@
 	width: 300px;
 	margin-left: -301px;
 	max-height: 200px;
-	overflow-y: scroll;
+	overflow-y: auto;
+
+	&.with-shadow {
+		max-height: 190px;
+		padding-bottom: 10px;
+	}
+
+	&.fullheight {
+		max-height: none;
+	}
 
 	.boxed-values {
 		margin-bottom: 0;
@@ -60,13 +69,14 @@
 	position: absolute;
 	left: -301px;
 	bottom: 0;
-	height: 20px;
+	height: 15px;
 	width: 300px;
-	box-shadow: inset 0 -20px 15px -10px #fff;
+	box-shadow: inset 0 -20px 15px -15px #fff;
 }
 
 .training-row-plot {
-	overflow: hidden;
+	// Removing this is required to see tooltips for selection in plots
+	//overflow: hidden;
 
 	.flot {
 		background: transparent;

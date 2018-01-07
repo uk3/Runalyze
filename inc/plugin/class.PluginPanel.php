@@ -38,7 +38,7 @@ abstract class PluginPanel extends Plugin {
 	 * @return int
 	 */
 	final public function type() {
-		return PluginType::Panel;
+		return PluginType::PANEL;
 	}
 
 	/**
@@ -95,7 +95,6 @@ abstract class PluginPanel extends Plugin {
 	 */
 	private function displayHeader() {
 		echo '<div class="panel-heading">';
-		//echo '<div class="icons-left"></div>';
 		echo '<div class="panel-menu">'.$this->getRightSymbol().'</div>';
 		echo '<h1 class="link clap" rel="'.$this->id().'">'.$this->name().'</h1>';
 		echo '<div class="hover-icons">'.$this->getConfigLinks().'</div>';
@@ -108,29 +107,6 @@ abstract class PluginPanel extends Plugin {
 	 */
 	public function setSurroundingDivVisible($value = true) {
 		$this->SurroundingDivIsVisible = $value;
-	}
-
-	/**
-	 * Function to (un)clap the plugin
-	 */
-	public function clap() {
-		if (!$this->isInActive()) {
-			DB::getInstance()->update('plugin', $this->id(), 'active', ($this->isActive() ? Plugin::ACTIVE_VARIOUS : Plugin::ACTIVE));
-		}
-	}
-
-	/**
-	 * Function to move the panel up or down
-	 * @param string $mode   'up' | 'down'
-	 */
-	public function move($mode) {
-		if ($mode == 'up') {
-			DB::getInstance()->exec('UPDATE `'.PREFIX.'plugin` SET `order`='.$this->order().' WHERE `type`="panel" AND `order`='.($this->order()-1).' LIMIT 1');
-			DB::getInstance()->update('plugin', $this->id(), 'order', ($this->order()-1));
-		} elseif ($mode == 'down') {
-			DB::getInstance()->exec('UPDATE `'.PREFIX.'plugin` SET `order`='.($this->order()).' WHERE `type`="panel" AND `order`='.($this->order()+1).' LIMIT 1');
-			DB::getInstance()->update('plugin', $this->id(), 'order', ($this->order()+1));
-		}
 	}
 
 	/**

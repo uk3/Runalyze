@@ -6,6 +6,8 @@
 
 namespace Runalyze\Activity;
 
+use Runalyze\Configuration;
+
 /**
  * HeartRate
  * 
@@ -26,12 +28,68 @@ class HeartRate {
 	protected $Athlete;
 
 	/**
+	 * Preferred heart rate unit
+	 * @var \Runalyze\Parameter\Application\HeartRateUnit
+	 */
+	protected $PreferredUnit;
+
+	/**
 	 * Constructor
 	 * @param int $valueInBPM
+	 * @param \Runalyze\Athlete|null $Athlete
 	 */
 	public function __construct($valueInBPM, \Runalyze\Athlete $Athlete = null) {
 		$this->value = $valueInBPM;
 		$this->Athlete = $Athlete;
+		$this->PreferredUnit = Configuration::General()->heartRateUnit();
+	}
+
+	/**
+	 * Set value
+	 * @param int $valueInBPM
+	 */
+	public function setBPM($valueInBPM) {
+		$this->value = $valueInBPM;
+	}
+
+	/**
+	 * Heart rate as string
+	 * @return string
+	 */
+	public function string() {
+		if ($this->PreferredUnit->isHRreserve() && $this->canShowInHRrest()) {
+			return $this->asHRrest();
+		} elseif ($this->PreferredUnit->isHRmax() && $this->canShowInHRmax()) {
+			return $this->asHRmax();
+		}
+
+		return $this->asBPM();
+	}
+
+	/**
+	 * As bpm
+	 * @return string
+	 */
+	public function asBPM() {
+		return $this->inBPM().'&nbsp;bpm';
+	}
+
+	/**
+	 * As %HRmax
+	 * Check first 'canShowInHRMax'!
+	 * @return string
+	 */
+	public function asHRmax() {
+		return $this->inHRmax().'&nbsp;&#37;';
+	}
+
+	/**
+	 * As %HRrest
+	 * Check first 'canShowInHRMax'!
+	 * @return string
+	 */
+	public function asHRrest() {
+		return $this->inHRrest().'&nbsp;&#37;';
 	}
 
 	/**
@@ -39,11 +97,11 @@ class HeartRate {
 	 * @return int
 	 */
 	public function inBPM() {
-		return $this->value;
+		return round($this->value);
 	}
 
 	/**
-	 * Value in [bpm]
+	 * Value in [%HRmax]
 	 * @return int
 	 */
 	public function inHRmax() {
@@ -51,11 +109,23 @@ class HeartRate {
 	}
 
 	/**
-	 * Value in [bpm]
+	 * Value in [%HRrest]
 	 * @return int
 	 */
 	public function inHRrest() {
 		return round(100 * ($this->value - $this->Athlete->restingHR()) / ($this->Athlete->maximalHR() - $this->Athlete->restingHR()));
+	}
+
+	/**
+	 * Value in [%] depending on preferred unit
+	 * @return int
+	 */
+	public function inPercent() {
+		if ($this->PreferredUnit->isHRreserve() && $this->canShowInHRrest()) {
+			return $this->inHRrest();
+		}
+
+		return $this->inHRmax();
 	}
 
 	/**
@@ -79,6 +149,6 @@ class HeartRate {
 	 * @return bool
 	 */
 	protected function knowsAthlete() {
-		return (NULL !== $this->Athlete);
+		return (null !== $this->Athlete);
 	}
 }

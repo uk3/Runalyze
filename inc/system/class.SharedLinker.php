@@ -10,40 +10,27 @@ use Runalyze\Configuration;
  * Class for handling links to shared activities
  * @author Hannes Christiansen
  * @package Runalyze\System
+ * @deprecated since v3.1
  */
 class SharedLinker {
 	/**
 	 * URL base for shared activities
 	 * @var string
 	 */
-	static public $URL = 'shared/';
+	public static $URL = 'shared/';
 
 	/**
 	 * User ID
 	 * @var int
 	 */
-	static public $USER_ID = 0;
-
-	/**
-	 * Private constructor 
-	 */
-	private function __construct() {}
+	public static $USER_ID = 0;
 
 	/**
 	 * Is the user on the shared page?
 	 * @return boolean
 	 */
-	static public function isOnSharedPage() {
-		return in_array('shared', explode('/', Request::Uri()));
-	}
-
-	/**
-	 * Get link to a given training
-	 * @param int $trainingID
-	 * @return string
-	 */
-	static public function getToolbarLinkTo($trainingID) {
-		return '<a href="'.self::getUrlFor($trainingID).'" target="_blank">'.Icon::$ATTACH.' '.__('Public link').'</a>';
+	public static function isOnSharedPage() {
+		return in_array('shared', explode('/', Request::Uri())) || in_array('athlete', explode('/', Request::Uri()));
 	}
 
 	/**
@@ -52,7 +39,7 @@ class SharedLinker {
 	 * @param string $text [optional]
 	 * @return string
 	 */
-	static public function getStandardLinkTo($trainingID, $text = null) {
+	public static function getStandardLinkTo($trainingID, $text = null) {
 		if (is_null($text)) {
 			$text = Icon::$ATTACH;
 		}
@@ -63,25 +50,25 @@ class SharedLinker {
 	/**
 	 * Get link to shared list for current user
 	 * @param string $text [optional]
-	 * @return string 
+	 * @return string
 	 */
-	static public function getListLinkForCurrentUser($text = null) {
+	public static function getListLinkForCurrentUser($text = null) {
+        if (is_null($text)) {
+            $text = '<i class="fa fa-fw fa-id-card-o"></i>';
+        }
+
 		if (!Configuration::Privacy()->listIsPublic()) {
-			return '';
-		}
-
-		if (is_null($text)) {
-			$text = Icon::$ATTACH;
-		}
-
-		return '<a href="shared/'.SessionAccountHandler::getUsername().'/" target="_blank" '.Ajax::tooltip('', __('Public list'), false, true).'>'.$text.'</a>';
-	}
+            return '<a class=window tab" href="settings?key=config_tab_general" '.Ajax::tooltip('', __('You can activate your public athlete page at <em>Configuration->Privacy</em>'), false, true).'>'.$text.'</a>';
+		} else {
+            return '<a href="athlete/' . SessionAccountHandler::getUsername() . '" target="_blank" ' . Ajax::tooltip('', __('Your public athlete page'), false, true) . '>' . $text . '</a>';
+        }
+    }
 
 	/**
 	 * Get training ID from request
 	 * @return int
 	 */
-	static public function getTrainingId() {
+	public static function getTrainingId() {
 		return self::urlToId( Request::param('url') );
 	}
 
@@ -89,10 +76,10 @@ class SharedLinker {
 	 * Get user ID
 	 * @return int
 	 */
-	static public function getUserId() {
+	public static function getUserId() {
 		if (self::$USER_ID <= 0) {
 			if (strlen(Request::param('user')) > 0) {
-				$Data = AccountHandler::getDataFor(Request::param('user'));
+                $Data = DB::getInstance()->query('SELECT * FROM `'.PREFIX.'account` WHERE `username`='.DB::getInstance()->escape(Request::param('user')).' LIMIT 1')->fetch();
 				self::$USER_ID = $Data['id'];
 			} elseif (strlen(Request::param('url')) > 0) {
 				DB::getInstance()->stopAddingAccountID();
@@ -114,27 +101,27 @@ class SharedLinker {
 	/**
 	 * Get URL for a given training
 	 * @param int $trainingID
-	 * @return string 
+	 * @return string
 	 */
-	static public function getUrlFor($trainingID) {
+	public static function getUrlFor($trainingID) {
 		return self::$URL.self::idToUrl($trainingID);
 	}
 
 	/**
 	 * Transform given ID to url
 	 * @param int $id
-	 * @return string 
+	 * @return string
 	 */
-	static private function idToUrl($id) {
+	private static function idToUrl($id) {
 		return base_convert((int)$id, 10, 35);
 	}
 
 	/**
 	 * Transform given url to ID
 	 * @param string $url
-	 * @return int 
+	 * @return int
 	 */
-	static private function urlToId($url) {
+	private static function urlToId($url) {
 		return (int)base_convert((string)$url, 35, 10);
 	}
 }

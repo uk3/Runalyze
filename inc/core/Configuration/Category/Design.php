@@ -28,18 +28,18 @@ class Design extends \Runalyze\Configuration\Category {
 	 * Create handles
 	 */
 	protected function createHandles() {
-		$this->createHandle('DESIGN_BG_FILE', new SelectFile('img/backgrounds/Default.jpg', array(
-			'folder' => 'img/backgrounds/',
+		$this->createHandle('DESIGN_BG_FILE', new SelectFile('web/assets/v2.x/img/backgrounds/runalyze.jpg', array(
+			'folder' => 'web/assets/v2.x/img/backgrounds/',
 			'extensions' => array('jpg', 'png', 'gif', 'jpeg', 'svg', 'tiff', 'bmp')
 		)));
 	}
 
 	/**
-	 * Fix background
-	 * @return bool
+	 * Background image
+	 * @return string path without leading 'web/'
 	 */
 	public function backgroundImage() {
-		return $this->get('DESIGN_BG_FILE');
+		return 'assets/v2.x/img/backgrounds/'.basename($this->get('DESIGN_BG_FILE'));
 	}
 
 	/**
@@ -65,7 +65,7 @@ class Design extends \Runalyze\Configuration\Category {
 	/**
 	 * Set background image to body
 	 */
-	static public function setBackgroundImageToBody() {
+	public static function setBackgroundImageToBody() {
 		$url = \Runalyze\Configuration::Design()->backgroundImage();
 
 		echo Ajax::wrapJSasFunction('$("body").css("background-image","url(\''.$url.'\')");');

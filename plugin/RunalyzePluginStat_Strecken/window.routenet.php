@@ -3,56 +3,88 @@
  * Window for routenet
  * @package Runalyze\Plugins\Stats
  */
-require '../../inc/class.Frontend.php';
+use Runalyze\View\Leaflet;
+use Runalyze\Model;
 
-$Frontend = new Frontend();
 
 require 'class.RunalyzePluginStat_Strecken.php';
+
+$sport = isset($_GET['sport']) ? (int)$_GET['sport'] : -1;
+$year = isset($_GET['y']) ? (int)$_GET['y'] : date('Y');
 ?>
 
 <div class="panel-heading">
+	<?php echo RunalyzePluginStat_Strecken::panelMenuForRoutenet($sport, $year); ?>
 	<h1><?php _e('Route network'); ?></h1>
 </div>
 
 <div class="panel-content">
 <?php
-$AllTrainings = DB::getInstance()->query('
-	SELECT
-		id,
-		time,
-		arr_time,
-		arr_lat,
-		arr_lon,
-		arr_alt,
-		arr_dist,
-		arr_heart,
-		arr_pace
-	FROM `'.PREFIX.'training`
-	WHERE `arr_lat`!=""
-	ORDER BY `time` DESC
-	LIMIT '.RunalyzePluginStat_Strecken::$MAX_ROUTES_ON_NET)->fetchAll();
+$Conditions = '';
 
-$Map = new LeafletMap('map', 600);
+if ($sport > 0) {
+	$Conditions .= ' AND `'.PREFIX.'training`.`sportid`='.(int)$sport;
+}
 
-$minLat = 999;
-$maxLat = -999;
-$minLng = 999;
-$maxLng = -999;
+if ($year > 0) {
+	$Conditions .= ' AND `'.PREFIX.'training`.`time` BETWEEN UNIX_TIMESTAMP(\''.(int)$year.'-01-01\') AND UNIX_TIMESTAMP(\''.((int)$year+1).'-01-01\')-1';
+}
 
-foreach ($AllTrainings as $Training) {
-	$GPS = new GpsData($Training);
-	$Bounds = $GPS->getBoundS();
+if (empty($Conditions)) {
+	$Routes = DB::getInstance()->query('
+		SELECT
+			`id`,
+			`geohashes`,
+			`min`,
+			`max`
+		FROM `'.PREFIX.'route`
+		WHERE `'.PREFIX.'route`.`accountid`='.SessionAccountHandler::getId().' AND
+				`geohashes`!="" '.$Conditions.'
+		ORDER BY `id` DESC
+		LIMIT '.RunalyzePluginStat_Strecken::MAX_ROUTES_ON_NET);
+} else {
+	$Routes = DB::getInstance()->query('
+		SELECT
+			`'.PREFIX.'route`.`id`,
+			`'.PREFIX.'route`.`geohashes`,
+			`'.PREFIX.'route`.`min`,
+			`'.PREFIX.'route`.`max`
+		FROM `'.PREFIX.'training`
+			LEFT JOIN `'.PREFIX.'route` ON `'.PREFIX.'training`.`routeid`=`'.PREFIX.'route`.`id`
+		WHERE `'.PREFIX.'training`.`accountid`='.SessionAccountHandler::getId().' AND`'.PREFIX.'route`.`geohashes`!="" '.$Conditions.'
+		ORDER BY `id` DESC
+		LIMIT '.RunalyzePluginStat_Strecken::MAX_ROUTES_ON_NET);
+}
 
-	$minLat = min($minLat, $Bounds['lat.min']);
-	$maxLat = max($maxLat, $Bounds['lat.max']);
-	$minLng = min($minLng, $Bounds['lng.min']);
-	$maxLng = max($maxLng, $Bounds['lng.max']);
+$Map = new Leaflet\Map('map-routenet', 600);
 
-	$Route = new LeafletTrainingRoute('route-'.$Training['id'], $GPS, false);
-	$Route->addOption('hoverable', false);
-	$Route->addOption('autofit', false);
+$minLat = 90;
+$maxLat = -90;
+$minLng = 180;
+$maxLng = -180;
 
-	$Map->addRoute($Route);
+while ($RouteData = $Routes->fetch()) {
+	$Route = new Model\Route\Entity($RouteData);
+
+	if (null !== $RouteData['min'] && null !== $RouteData['max']) {
+		$MinCoordinate = (new League\Geotools\Geohash\Geohash())->decode($RouteData['min'])->getCoordinate();
+		$MaxCoordinate = (new League\Geotools\Geohash\Geohash())->decode($RouteData['max'])->getCoordinate();
+
+		$minLat = $MinCoordinate->getLatitude() != 0 ? min($minLat, $MinCoordinate->getLatitude()) : $minLat;
+		$minLng = $MinCoordinate->getLongitude() != 0 ? min($minLng, $MinCoordinate->getLongitude()) : $minLng;
+		$maxLat = $MaxCoordinate->getLatitude() != 0 ? max($maxLat, $MaxCoordinate->getLatitude()) : $maxLat;
+		$maxLng = $MaxCoordinate->getLongitude() != 0 ? max($maxLng, $MaxCoordinate->getLongitude()) : $maxLng;
+	}
+
+	$Path = new Leaflet\Activity('route-'.$RouteData['id'], $Route, null, false);
+	$Path->addOption('hoverable', false);
+	$Path->addOption('autofit', false);
+
+	$Map->addRoute($Path);
+}
+
+if (!isset($Route)) {
+	echo HTML::error(__('There are no routes matching the criterias.'));
 }
 
 $Map->setBounds(array(
@@ -65,7 +97,7 @@ $Map->display();
 ?>
 
 <p class="info">
-	<?php echo sprintf( __('The network contains your last %s routes.'), RunalyzePluginStat_Strecken::$MAX_ROUTES_ON_NET ); ?>
+	<?php echo sprintf( __('The map contains your %s most recent routes matching the criterias.'), RunalyzePluginStat_Strecken::MAX_ROUTES_ON_NET ); ?>
 	<?php _e('More routes are not possible at the moment due to performance issues.'); ?>
 </p>
 </div>

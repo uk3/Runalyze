@@ -6,8 +6,10 @@
 
 namespace Runalyze\Configuration\Category;
 
+use Runalyze\Configuration\Messages;
 use Runalyze\Configuration\Fieldset;
-use Runalyze\Parameter\Int;
+use Runalyze\Parameter\Integer;
+use Runalyze\Parameter\Boolean;
 use Ajax;
 
 /**
@@ -16,6 +18,12 @@ use Ajax;
  * @package Runalyze\Configuration\Category
  */
 class Trimp extends \Runalyze\Configuration\Category {
+	/**
+	 * Flag: recalculation triggered?
+	 * @var boolean
+	 */
+	private static $TRIGGERED = false;
+
 	/**
 	 * Internal key
 	 * @return string
@@ -28,8 +36,10 @@ class Trimp extends \Runalyze\Configuration\Category {
 	 * Create handles
 	 */
 	protected function createHandles() {
-		$this->createHandle('ATL_DAYS', new Int(7));
-		$this->createHandle('CTL_DAYS', new Int(42));
+		$this->createHandle('ATL_DAYS', new Integer(7));
+		$this->createHandle('CTL_DAYS', new Integer(42));
+		$this->createHandle('TRIMP_MODEL_IN_PERCENT', new Boolean(true));
+		$this->createHandle('TSB_IN_PERCENT', new Boolean(false));
 	}
 
 	/**
@@ -49,14 +59,33 @@ class Trimp extends \Runalyze\Configuration\Category {
 	}
 
 	/**
+	 * Show ATL/CTL in percent?
+	 * @return boolean
+	 */
+	public function showInPercent() {
+		return $this->get('TRIMP_MODEL_IN_PERCENT');
+	}
+
+	/**
+	 * Show TSB in percent?
+	 * @return boolean
+	 */
+	public function showTSBinPercent() {
+		return $this->get('TSB_IN_PERCENT');
+	}
+
+	/**
 	 * Register onchange events
 	 */
 	protected function registerOnchangeEvents() {
-		$this->handle('ATL_DAYS')->registerOnchangeEvent('Runalyze\\Configuration\\Messages::useCleanup');
+		$this->handle('ATL_DAYS')->registerOnchangeEvent('Runalyze\\Configuration\\Category\\Trimp::triggerRecalculation');
 		$this->handle('ATL_DAYS')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
 
-		$this->handle('CTL_DAYS')->registerOnchangeEvent('Runalyze\\Configuration\\Messages::useCleanup');
+		$this->handle('CTL_DAYS')->registerOnchangeEvent('Runalyze\\Configuration\\Category\\Trimp::triggerRecalculation');
 		$this->handle('CTL_DAYS')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
+
+		$this->handle('TRIMP_MODEL_IN_PERCENT')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
+		$this->handle('TSB_IN_PERCENT')->registerOnchangeFlag(Ajax::$RELOAD_PLUGINS);
 	}
 
 	/**
@@ -76,6 +105,41 @@ class Trimp extends \Runalyze\Configuration\Category {
 			'tooltip'	=> __('Number of days for CTL time constant')
 		));
 
+		$Fieldset->addHandle( $this->handle('TRIMP_MODEL_IN_PERCENT'), array(
+			'label'		=> __('Show ATL/CTL in percent of your maximum'),
+			'tooltip'	=> __('By default ATL/CTL are scaled based on your historical maximum. '.
+							'This can lead to wrong assumptions if you were overtrained. '.
+							'Deactivate this option in that case.')
+		));
+
+		$Fieldset->addHandle( $this->handle('TSB_IN_PERCENT'), array(
+			'label'		=> __('Show TSB in percent of ATL/CTL'),
+			'tooltip'	=> __('The scale of TSB values depends on your ATL/CTL. '.
+							'You can display TSB as percentage of your current ATL/CTL to keep consistency.')
+		));
+
 		return $Fieldset;
+	}
+
+	/**
+	 * Trigger recalculation
+	 */
+	public static function triggerRecalculation() {
+		if (!self::$TRIGGERED) {
+			self::$TRIGGERED = true;
+
+			$Data = \Runalyze\Configuration::Data();
+
+			$oldCTL = $Data->maxCTL();
+			$oldATL = $Data->maxATL();
+
+			$Data->recalculateMaxValues();
+
+			$newCTL = $Data->maxCTL();
+			$newATL = $Data->maxATL();
+
+			Messages::addValueRecalculated(__('Maximal CTL'), $newCTL, $oldCTL);
+			Messages::addValueRecalculated(__('Maximal ATL'), $newATL, $oldATL);
+		}
 	}
 }

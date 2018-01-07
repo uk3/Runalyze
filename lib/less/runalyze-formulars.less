@@ -62,6 +62,11 @@ input[type=submit], .button {
 	color: #FFF !important;
 	cursor: pointer;
 	padding: 5px 12px !important;
+	min-width: 100px;
+
+	&.danger {
+		background-color: @color-danger;
+	}
 }
 
 .button {
@@ -117,6 +122,13 @@ fieldset {
 		padding: 3px 0;
 	}
 
+	label,
+	.checkbox-collection > div {
+		text-overflow: ellipsis;
+		overflow: hidden;
+		white-space: nowrap;
+	}
+
 	.toolbar-line label {
 		float: none;
 		width: auto;
@@ -154,16 +166,44 @@ fieldset {
 	.small-size { width: 60px; }
 	.middle-size { width: 120px; }
 	.full-size { width: 53%; }
+	.chosen-container { width: 53%!important; }
 	.fullwidth { width: 95%; }
 	.with50erLabel label { width: 22.5%; }
 	.with50erLabel .full-size { width: 75%; }
+	.with50erLabel .chosen-container { width: 75%!important; }
 	.with50erLabel .inline label { float: none; }
 	.with33erLabel label { width: 14.85%; }
-	.with33erLabel .full-size { width: 85%; }
+	.with33erLabel .full-size { width: 84%; }
+	.with33erLabel .chosen-container { width: 84%!important; }
 	.w50.with33erLabel label { width: 29.7%; }
 	.w50.with33erLabel .full-size { width: 65%; }
+	.w50.with33erLabel .chosen-container { width: 65%!important; }
 	.with33erLabel .inline label { float: none; }
 	textarea.full-size { height: 72px; }
+
+	.checkbox-first {
+		position: relative;
+
+		label {
+			display: block;
+			width: 100%;
+			float: none;
+			line-height: 21px;
+			text-indent: 16px;
+
+			> * {
+				text-indent: initial;
+			}
+		}
+
+		input {
+			position: absolute;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			margin: auto 0;
+		}
+	}
 }
 
 .input-with-unit {
@@ -172,16 +212,17 @@ fieldset {
 	input { padding: 2px 30px 2px 0; text-align: right; }
 	.small-size { width: 34px; }
 	.middle-size { width: 94px; }
+	.full-size { width: 46%; }
 	.small-size.pick-a-date { width: 60px; }
 
 	.input-unit {
 		position: absolute;
 		top: 0;
 		right: 0;
-		width: 30px;
+		width: 30px !important;
 		display: block;
 		text-align: center;
-		float: none;
+		float: none !important;
 		font-weight: normal;
 		font-size: 0.9em;
 		color: #ccc;
@@ -189,7 +230,17 @@ fieldset {
 	}
 }
 
-:invalid, fieldset .validation-failed {
+:invalid, fieldset .validation-failed,
+select.chosen-select:invalid + .chosen-container .chosen-choices {
 	background-color: @formular-invalid-background;
 	border-color: @formular-invalid-border;
+}
+
+form:invalid,
+fieldset:invalid {
+	background-color: transparent;
+}
+
+ol.splits li {
+	padding-bottom: 3px;
 }

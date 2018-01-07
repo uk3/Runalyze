@@ -5,20 +5,20 @@
  */
 /**
  * Section of the training view
- * 
+ *
  * @author Hannes Christiansen
  * @package Runalyze\DataObjects\Training\View\Section
  */
 abstract class TrainingViewSectionTabbed extends TrainingViewSection {
 	/**
 	 * All tabbed rows
-	 * @var SectionRow[]
+	 * @var TrainingViewSectionRowAbstract[]
 	 */
 	protected $RowsTabbed = array();
 
 	/**
 	 * All tabbed rows: Title
-	 * @var SectionRow[]
+	 * @var string[]
 	 */
 	protected $RowsTabbedTitle = array();
 
@@ -27,7 +27,7 @@ abstract class TrainingViewSectionTabbed extends TrainingViewSection {
 	 * @param TrainingViewSectionRowAbstract $Row
 	 * @param string $Title
 	 */
-	final protected function appendRowTabbed(TrainingViewSectionRowAbstract &$Row, $Title) {
+	final protected function appendRowTabbed(TrainingViewSectionRowAbstract $Row, $Title) {
 		$this->RowsTabbed[] = $Row;
 		$this->RowsTabbedTitle[] = $Title;
 	}
