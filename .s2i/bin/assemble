@@ -6,10 +6,8 @@ rc=$?
 
 if [ $rc -eq 0 ]; then
     cd /opt/app-root/src/
-    if [ "$HTTPS" == "on" ]; then
-        echo "Setting default HTTPS"
-        echo "SetEnv HTTPS on" >> web/.htaccess
-    fi
+    echo "Setting default HTTPS"
+    echo "SetEnvIf X-Forwarded-Proto \"https\" HTTPS=on" >> web/.htaccess
     echo "Installing some Node stuff"
     npm install
     node_modules/gulp-cli/bin/gulp.js
